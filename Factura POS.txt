@@ -1,0 +1,20 @@
+﻿          logo_elvacilon1.png
+     EL VACILÓN SALSA CLUB
+  Carrera 23a #7A - 15
+ Cel: 3147159066 - 3136188889
+ Instagram: @elvacilonclub
+----------------------------------------
+             CUENTA DE CONSUMO
+----------------------------------------
+Mesa: [Número mesa]
+Fecha: [DD/MM/AAAA HH:MM]
+----------------------------------------
+Cant  Producto              Valor
+----------------------------------------
+Subtotal:        $xx.xxx
+Propina (10%):   $x.xxx
+Total:           $xx.xxx
+----------------------------------------
+    ¡Gracias por su visita!
+       El Vacilón Salsa Club
+----------------------------------------
