@@ -1,182 +1,844 @@
-﻿<!DOCTYPE html>
+﻿<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>El Vacilón Salsa Club</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>El Vacilón Salsa Club — Sistema</title>
+
+  <!-- Fuente -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- SheetJS para leer XLSX -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
-  <!-- VIDEO DE FONDO -->
-  <video autoplay muted loop id="bgVideo">
-    <source src="video_elvacilon1.mp4" type="video/mp4">
-  </video>
-
-  <!-- LOGIN -->
-  <div id="loginScreen" class="login-container">
-    <img src="logo_elvacilon1.png" alt="Logo" class="logo">
-    <h1>Bienvenido a <span>El Vacilón Salsa Club</span></h1>
-    <input id="inputUser" type="text" placeholder="Usuario">
-    <input id="inputPass" type="password" placeholder="Contraseña">
-    <button id="btnLogin">Ingresar</button>
-  </div>
-
-  <!-- APLICACIÓN -->
-  <div id="app" class="hidden app-container">
-    <div class="top-bar">
-      <h2>El Vacilón Salsa Club</h2>
-      <div id="userInfo"></div>
-      <button id="btnLogout">Salir</button>
+  <!-- LOGIN STAGE: video de fondo + logo animado + fade-in -->
+  <div id="login-stage">
+    <div id="videoWrapper">
+      <video id="bgVideo" autoplay muted loop playsinline>
+        <source src="video_elvacilon1.mp4" type="video/mp4">
+      </video>
     </div>
 
-    <div class="controls">
-      <button id="btnSelectDay">Seleccionar día de precios</button>
-      <button id="btnPrintPriceList">Imprimir lista de precios</button>
-    </div>
+    <div id="loginOverlay" class="fade-in">
+      <img id="logo" src="logo_elvacilon1.png" alt="El Vacilón Logo">
+      <h1 id="brandTitle">El Vacilón <span>Salsa Club</span></h1>
 
-    <div id="productsPanel" class="hidden">
-      <h3>Lista de productos</h3>
-      <input type="text" id="searchInput" placeholder="Buscar producto o número...">
-      <table id="productsTable">
-        <thead>
-          <tr><th>#</th><th>Producto</th><th>Precio</th><th>Acción</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- MODAL DE SELECCIÓN DE PRECIOS -->
-  <div id="modalDay" class="modal hidden">
-    <div class="modal-content">
-      <h3>Seleccione día de precios</h3>
-      <label><input type="radio" name="dayPrice" value="JVS.xlsx" checked> Día Normal</label>
-      <label><input type="radio" name="dayPrice" value="DOMINGO.xlsx"> Domingo</label>
-      <div class="modal-buttons">
-        <button id="btnLoadPrices">Cargar precios</button>
-        <button id="btnCancelModal" class="cancel">Cancelar</button>
+      <div id="loginBox">
+        <input id="inputUser" type="text" placeholder="Usuario (ej: alex)" autocomplete="username">
+        <input id="inputPass" type="password" placeholder="Contraseña" autocomplete="current-password">
+        <div class="row">
+          <button id="btnLogin" class="btn primary">Ingresar</button>
+          <button id="btnDemo" class="btn ghost">Demo</button>
+        </div>
+        <p class="muted small">© 2025 El Vacilón Salsa Club — Carrera 23a #7A - 15 — @elvacilonclub</p>
       </div>
     </div>
   </div>
 
-  <footer>
-    © 2025 El Vacilón Salsa Club — Carrera 23a # 7A - 15 — Cel: 3147159066 / 3136188889 — Instagram: @elvacilonclub
-  </footer>
+  <!-- APP (oculto hasta login) -->
+  <div id="app" class="hidden app-container">
+    <header class="app-header">
+      <div class="header-left">
+        <img src="logo_elvacilon1.png" class="small-logo" alt="logo">
+        <div>
+          <div class="title">El Vacilón Salsa Club</div>
+          <div id="userInfo" class="muted small"></div>
+        </div>
+      </div>
 
-  <script>
-    // ======== VARIABLES GLOBALES ========
-    const USERS = {
-      admin: '123456789',
-      cajera: '123456',
-      alex: '123',
-      santiago: '456',
-      mesero3: '3',
-      mesero4: '4'
-    };
+      <div class="header-right">
+        <div id="clock" class="muted small">--:--:--</div>
+        <div id="counters" class="muted small">Ocupadas: 0 / Libres: 32</div>
 
-    let currentUser = null;
-    let role = null;
-    let products = [];
+        <button id="btnSelectDay" class="btn ghost hidden" title="Cargar precios desde archivos">Seleccione día</button>
+        <button id="btnPrintPriceList" class="btn ghost">Imprimir lista</button>
+        <button id="btnViewComandas" class="btn ghost hidden">Ver Comandas</button>
+        <button id="btnViewHistory" class="btn ghost hidden">Historial de Cierres</button>
+        <button id="btnExportCSV" class="btn ghost hidden">Exportar Cierre (CSV)</button>
+        <button id="btnCloseDay" class="btn ghost hidden">Cerrar día</button>
+        <button id="btnRestore" class="btn danger hidden" title="Restaurar sistema (admin)">Restaurar sistema</button>
+        <button id="btnLogout" class="btn danger">Salir</button>
+      </div>
+    </header>
 
-    const $ = id => document.getElementById(id);
-    const money = n => '$' + Number(n).toLocaleString();
+    <main class="main-grid">
+      <!-- izquierda: mesas (o tabla de comandas / historial si activo) -->
+      <section class="left-panel">
+        <div id="mesasContainer">
+          <h3>Mesas y Barras</h3>
+          <div id="tablesGrid" class="tables-grid" aria-live="polite"></div>
+        </div>
 
-    // ======== LOGIN ========
-    $('btnLogin').addEventListener('click', () => {
-      const user = $('inputUser').value.trim().toLowerCase();
-      const pass = $('inputPass').value.trim();
-      if (!USERS[user] || USERS[user] !== pass) {
-        alert('Usuario o contraseña incorrectos');
-        return;
-      }
-      currentUser = user;
-      role = (user === 'admin') ? 'admin' : (user === 'cajera') ? 'cajera' : 'mesero';
-      $('loginScreen').classList.add('hidden');
-      $('app').classList.remove('hidden');
-      $('userInfo').innerText = `Usuario: ${user} (${role})`;
+        <div id="comandasContainer" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <h3>Comandas (Cajera)</h3>
+            <div>
+              <label><input type="radio" name="comFilter" value="all" checked> Todas</label>
+              <label><input type="radio" name="comFilter" value="open"> Abiertas</label>
+              <label><input type="radio" name="comFilter" value="closed"> Cerradas</label>
+              <button id="btnBackToMesas" class="btn ghost">Volver a Mesas</button>
+            </div>
+          </div>
 
-      // Solo meseros y cajera ven el modal
-      if (role !== 'admin') {
-        setTimeout(() => $('modalDay').classList.remove('hidden'), 300);
-      }
-    });
+          <div id="comandasCounters" class="muted small">Abiertas: 0 / Cerradas: 0</div>
 
-    // ======== MODAL ========
-    $('btnCancelModal').addEventListener('click', () => $('modalDay').classList.add('hidden'));
+          <div style="margin-top:8px">
+            <table id="comandasTable" class="striped">
+              <thead><tr><th>Mesa</th><th>Mesero</th><th>Estado</th><th>Subtotal</th><th>Propina</th><th>Total</th><th>Fecha</th><th>Acciones</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
 
-    $('btnLoadPrices').addEventListener('click', async () => {
-      const selected = document.querySelector('input[name="dayPrice"]:checked').value;
-      try {
-        await loadExcel(selected);
-        $('modalDay').classList.add('hidden');
-        renderProducts();
-        alert(`Precios cargados desde ${selected}`);
-      } catch (e) {
-        alert('Error al cargar archivo. Asegúrate que está en la misma carpeta.');
-        console.error(e);
-      }
-    });
+        <div id="historyContainer" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <h3>Historial de Cierres</h3>
+            <div>
+              <button id="btnBackFromHistory" class="btn ghost">Volver a Mesas</button>
+            </div>
+          </div>
 
-    // ======== CARGAR EXCEL ========
-    async function loadExcel(file) {
-      const res = await fetch(file);
-      const ab = await res.arrayBuffer();
-      const wb = XLSX.read(ab, { type: 'array' });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-      products = json.map((row, i) => ({
-        id: i + 1,
-        nombre: row['producto'] || row['Producto'] || Object.values(row)[0],
-        precio: row['valor'] || row['Valor'] || Object.values(row)[1]
-      }));
+          <div id="historyCounters" class="muted small">Registros: 0</div>
+
+          <div style="margin-top:8px">
+            <table id="historyTable" class="striped">
+              <thead><tr><th>Fecha</th><th>Total Ventas</th><th>Comandas cerradas</th><th>Generado por</th><th>Acciones</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- derecha: comanda / carrito -->
+      <aside class="right-panel">
+        <h3>Comanda</h3>
+
+        <div id="noSession" class="panel">
+          <p class="muted">No hay mesa abierta. Haga clic en una mesa o abra manualmente abajo.</p>
+          <div class="row" style="margin-top:8px">
+            <input id="manualTable" placeholder="Ej: 1, 1A, B1">
+            <button id="btnOpenManual" class="btn primary">Abrir</button>
+          </div>
+        </div>
+
+        <div id="sessionPanel" class="panel hidden">
+          <div class="session-header">
+            <div>Mesa: <span id="sessionTable" class="badge">—</span></div>
+            <div>Mesero: <span id="sessionOwner" class="badge">—</span></div>
+            <div>Status: <span id="sessionStatus" class="muted">ABIERTA</span></div>
+          </div>
+
+          <div class="add-controls" style="margin-top:8px">
+            <input id="prodNumber" placeholder="N° producto" style="width:110px">
+            <input id="prodQty" type="number" min="1" value="1" style="width:80px">
+            <button id="btnAddByNumber" class="btn primary">Agregar</button>
+            <button id="btnAddManual" class="btn ghost">Agregar manual</button>
+          </div>
+
+          <div class="small muted" style="margin-top:10px">Productos (tabla):</div>
+          <div class="small-scroll" style="max-height:160px;margin-top:6px">
+            <table id="productsTableSmall" class="striped">
+              <thead><tr><th style="width:60px">#</th><th>Producto</th><th style="width:120px">Precio</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div style="margin-top:10px">
+            <table id="cartTable" class="striped">
+              <thead><tr><th>#</th><th>Producto</th><th style="width:70px">Cant</th><th style="width:100px">Valor</th><th style="width:100px">Total</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="totals" style="margin-top:8px">
+            <div>Subtotal: <strong id="subtotal">$0</strong></div>
+            <div>Propina: <label><input id="chkTip" type="checkbox" checked></label> <label style="margin-left:8px"> <input id="tipPercent" type="number" min="0" value="10" style="width:60px"> %</label></div>
+            <div class="grand">Total: <strong id="grandTotal">$0</strong></div>
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <button id="btnPrintTicket" class="btn primary">Imprimir Cuenta (POS)</button>
+            <button id="btnCloseSession" class="btn ghost">Cerrar y marcar pagada</button>
+            <button id="btnForceRelease" class="btn danger">Forzar liberar</button>
+          </div>
+        </div>
+
+      </aside>
+    </main>
+  </div>
+
+  <!-- MODAL: seleccionar día de precios -->
+  <div id="modalDay" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <h3>Seleccione día de precios</h3>
+      <label class="radio"><input type="radio" name="dayPrice" value="JVS.xlsx" checked> Día normal (JVS.xlsx)</label>
+      <label class="radio"><input type="radio" name="dayPrice" value="DOMINGO.xlsx"> Domingo (DOMINGO.xlsx)</label>
+      <div class="modal-actions">
+        <button id="btnLoadPrices" class="btn primary">Cargar precios</button>
+        <button id="btnCancelModal" class="btn ghost">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ============================
+  Usuarios: usuario:contraseña
+============================ */
+const USERS = {
+  alex: '123',
+  santiago: '456',
+  mesero3: '3',
+  mesero4: '4',
+  cajera: '123456',
+  admin: '123456789'
+};
+
+/* ---------------------------
+  Estado global
+----------------------------*/
+let currentUser = null;
+let role = null;
+let products = []; // {id,nombre,precio}
+let tables = [];   // {id,type,occupied,sessionId,owner,visitCount}
+let sessions = {}; // sessionId -> {id,tableId,owner,items,createdAt,closed,visitLabel,tip}
+
+/* historial de cierres guardado en localStorage: array de {date,total, count, user, filename, csv} */
+const HISTORY_KEY = 'ev_history_v1';
+const STATE_KEY = 'ev_state_final_v2';
+
+/* helpers */
+const $ = id => document.getElementById(id);
+const money = n => '$' + Number(Math.round(n)).toLocaleString();
+const parseNum = v => Number(String(v||0).replace(/[^0-9.\-]/g,'')) || 0;
+const escapeHtml = s => String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+/* ---------------------------
+  Init UI
+----------------------------*/
+document.addEventListener('DOMContentLoaded', () => {
+  initTables();
+  bindUI();
+  loadState();
+  renderTables();
+  renderCounters();
+  startClock();
+});
+
+/* ---------------------------
+  Clock
+----------------------------*/
+function startClock(){
+  const el = $('clock');
+  function tick(){
+    const now = new Date();
+    const opts = { weekday:'long', year:'numeric', month:'2-digit', day:'2-digit' };
+    const dateStr = now.toLocaleDateString('es-ES', opts);
+    const timeStr = now.toLocaleTimeString('es-CO');
+    el.innerText = `${capitalize(dateStr)} — ${timeStr}`;
+  }
+  tick(); setInterval(tick, 1000);
+}
+function capitalize(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+/* ---------------------------
+  Crear tablas (28 mesas + 4 barras)
+----------------------------*/
+function initTables(){
+  tables = [];
+  for(let i=1;i<=28;i++) tables.push({ id: String(i), type:'mesa', occupied:false, sessionId:null, owner:null, visitCount:0 });
+  for(let b=1;b<=4;b++) tables.push({ id: 'B' + b, type:'barra', occupied:false, sessionId:null, owner:null, visitCount:0 });
+}
+
+/* ---------------------------
+  UI events binding
+----------------------------*/
+function bindUI(){
+  $('btnLogin').addEventListener('click', onLogin);
+  $('btnDemo').addEventListener('click', ()=> { $('inputUser').value='alex'; $('inputPass').value='123'; onLogin(); });
+  $('btnLogout').addEventListener('click', ()=> location.reload());
+  $('btnSelectDay').addEventListener('click', ()=> showModal());
+  $('btnPrintPriceList').addEventListener('click', printPriceList);
+  $('btnLoadPrices').addEventListener('click', async ()=> { await loadSelectedPrices(); hideModal(); renderProductsSmall(); alert('Productos cargados: ' + products.length); });
+  $('btnCancelModal').addEventListener('click', hideModal);
+  $('btnOpenManual').addEventListener('click', manualOpen);
+  $('btnAddByNumber')?.addEventListener('click', addByNumberHandler);
+  $('btnAddManual')?.addEventListener('click', addManualHandler);
+  $('btnPrintTicket').addEventListener('click', printTicketPOS);
+  $('btnCloseSession').addEventListener('click', closeSessionHandler);
+  $('btnForceRelease').addEventListener('click', forceReleaseHandler);
+  $('btnViewComandas').addEventListener('click', showComandasView);
+  $('btnBackToMesas').addEventListener('click', showMesasView);
+  $('btnViewHistory').addEventListener('click', showHistoryView);
+  $('btnBackFromHistory').addEventListener('click', showMesasView);
+  $('btnExportCSV').addEventListener('click', exportCSVHandler);
+  $('btnCloseDay').addEventListener('click', closeDayHandler);
+  $('btnRestore').addEventListener('click', restoreSystemHandler);
+
+  document.querySelectorAll('input[name="comFilter"]').forEach(r => r.addEventListener('change', renderComandasTable));
+}
+
+/* ---------------------------
+  Login
+----------------------------*/
+function onLogin(){
+  const u = $('inputUser').value.trim().toLowerCase();
+  const p = $('inputPass').value.trim();
+  if(!u || !p) return alert('Ingrese usuario y contraseña');
+  if(!USERS[u] || USERS[u] !== p) return alert('Usuario o contraseña incorrectos');
+
+  currentUser = u;
+  role = (u === 'cajera') ? 'cajera' : (u === 'admin') ? 'admin' : 'mesero';
+
+  // show app, hide login stage and video
+  document.getElementById('login-stage').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+
+  // show/hide buttons by role
+  if(role !== 'admin') $('btnSelectDay').classList.remove('hidden'); else $('btnSelectDay').classList.add('hidden');
+  if(role === 'cajera') $('btnViewComandas').classList.remove('hidden'); else $('btnViewComandas').classList.add('hidden');
+  if(role === 'cajera' || role === 'admin') $('btnExportCSV').classList.remove('hidden'); else $('btnExportCSV').classList.add('hidden');
+  if(role === 'admin') { $('btnCloseDay').classList.remove('hidden'); $('btnRestore').classList.remove('hidden'); } else { $('btnCloseDay').classList.add('hidden'); $('btnRestore').classList.add('hidden'); }
+  // View history available to cajera and admin
+  if(role === 'cajera' || role === 'admin') $('btnViewHistory').classList.remove('hidden'); else $('btnViewHistory').classList.add('hidden');
+
+  $('userInfo').innerText = `${currentUser} — ${role}`;
+  renderTables(); renderCounters();
+}
+
+/* ---------------------------
+  Render cuadrícula de mesas
+----------------------------*/
+function renderTables(){
+  const grid = $('tablesGrid');
+  grid.innerHTML = '';
+  tables.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'table-btn';
+    btn.dataset.id = t.id;
+    btn.innerText = (t.type === 'barra') ? `Barra ${t.id.replace('B','')}` : `Mesa ${t.id}`;
+    if(t.occupied){
+      if(t.owner === currentUser) btn.classList.add('occupied-own');
+      else btn.classList.add('occupied');
+    } else {
+      btn.classList.add('free');
     }
+    btn.addEventListener('click', ()=> onTableClick(t.id));
+    grid.appendChild(btn);
+  });
+}
 
-    // ======== MOSTRAR PRODUCTOS ========
-    function renderProducts() {
-      const tbody = $('productsTable').querySelector('tbody');
-      tbody.innerHTML = '';
-      products.forEach(p => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${p.id}</td>
-          <td>${p.nombre}</td>
-          <td>${money(p.precio)}</td>
-          <td><button>Agregar</button></td>`;
-        tbody.appendChild(tr);
+/* ---------------------------
+  Contadores
+----------------------------*/
+function renderCounters(){
+  const total = tables.length;
+  const occupied = tables.filter(t => t.occupied).length;
+  const free = total - occupied;
+  $('counters').innerText = `Ocupadas: ${occupied} / Libres: ${free}`;
+}
+
+/* ---------------------------
+  Click mesa -> abrir/comprobar permissions
+----------------------------*/
+function onTableClick(tableId){
+  const t = tables.find(x => x.id === tableId);
+  if(!t) return;
+  // if occupied by another and user is mesero -> block
+  if(t.occupied && t.owner && t.owner !== currentUser && role === 'mesero'){
+    alert(`Mesa ocupada por ${t.owner}. No puede tomar pedidos.`);
+    return;
+  }
+  // if already has session -> open
+  if(t.occupied && t.sessionId){
+    openSession(t.sessionId);
+    return;
+  }
+  // else create session and assign to user
+  if(!currentUser) return alert('Inicie sesión primero');
+  const sid = 's_' + Math.random().toString(36).slice(2,9);
+  t.visitCount = (t.visitCount || 0) + 1;
+  const suffix = t.visitCount === 1 ? '' : String.fromCharCode(64 + (t.visitCount - 1)); // 2->A,3->B
+  const visitLabel = t.id + (suffix || '');
+  const sess = { id: sid, tableId: t.id, owner: currentUser, items: [], createdAt: new Date().toISOString(), closed:false, visitLabel, tip: null };
+  sessions[sid] = sess;
+  t.occupied = true; t.sessionId = sid; t.owner = currentUser;
+  saveState(); renderTables(); renderCounters(); openSession(sid);
+}
+
+/* ---------------------------
+  Abrir sesión en panel derecho
+----------------------------*/
+function openSession(sessionId){
+  const sess = sessions[sessionId];
+  if(!sess) return alert('Sesión no encontrada');
+  if(role === 'mesero' && sess.owner !== currentUser){
+    alert('Solo puede ver sus propias comandas. Esta pertenece a ' + sess.owner);
+    return;
+  }
+  $('noSession').classList.add('hidden');
+  $('sessionPanel').classList.remove('hidden');
+  $('sessionTable').innerText = sess.visitLabel || sess.tableId;
+  $('sessionOwner').innerText = sess.owner;
+  $('sessionStatus').innerText = sess.closed ? 'CERRADA' : 'ABIERTA';
+  renderProductsSmall();
+  renderCart(sess);
+}
+
+/* ---------------------------
+  Carga de productos desde Excel (fetch + SheetJS)
+----------------------------*/
+async function loadSelectedPrices(){
+  const file = document.querySelector('input[name="dayPrice"]:checked')?.value || 'JVS.xlsx';
+  await loadProductsFromExcel(file);
+  hideModal();
+}
+async function loadProductsFromExcel(filename){
+  try {
+    const res = await fetch(filename);
+    if(!res.ok) throw new Error('Archivo no encontrado: ' + filename);
+    const ab = await res.arrayBuffer();
+    const wb = XLSX.read(ab, { type:'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    products = json.map((row, idx) => {
+      const keys = Object.keys(row);
+      let nombre = '', precio = 0;
+      for(const k of keys){
+        const kl = k.toLowerCase();
+        if(kl.includes('producto') || kl.includes('nombre') || kl.includes('product')) nombre = row[k];
+        if(kl.includes('valor') || kl.includes('precio') || kl.includes('price')) precio = row[k];
+      }
+      if(!nombre && keys.length>=1) nombre = row[keys[0]];
+      if((!precio || precio===0) && keys.length>=2) precio = row[keys[1]];
+      return { id: idx+1, nombre: String(nombre).trim(), precio: parseNum(precio) };
+    }).filter(p => p.nombre);
+    saveState();
+  } catch(e){
+    console.error(e); throw e;
+  }
+}
+function showModal(){ $('modalDay').classList.remove('hidden'); }
+function hideModal(){ $('modalDay').classList.add('hidden'); }
+
+/* ---------------------------
+  Render tabla pequeña de productos
+----------------------------*/
+function renderProductsSmall(){
+  const tbody = document.querySelector('#productsTableSmall tbody');
+  tbody.innerHTML = '';
+  if(!products || products.length===0) { tbody.innerHTML = '<tr><td colspan="3" class="muted">No hay productos (cargue lista)</td></tr>'; return; }
+  products.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="center">${p.id}</td><td>${escapeHtml(p.nombre)}</td><td class="right">${money(p.precio)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ---------------------------
+  Agregar por número
+----------------------------*/
+function addByNumberHandler(){
+  const num = parseInt($('prodNumber').value);
+  const qty = parseInt($('prodQty').value) || 1;
+  if(!num) return alert('Ingrese N° de producto');
+  const prod = products.find(p => p.id === num);
+  if(!prod) return alert('Producto no encontrado. Cargue la lista de precios.');
+  const sid = getCurrentSessionId();
+  if(!sid) return alert('Abra una mesa primero');
+  const sess = sessions[sid];
+  if(sess.owner !== currentUser && role !== 'cajera' && role !== 'admin') return alert('No puede modificar esta comanda');
+  const item = sess.items.find(i => i.productId === prod.id);
+  if(item) item.qty += qty; else sess.items.push({ productId: prod.id, name: prod.nombre, price: prod.precio, qty });
+  saveState(); renderCart(sess); updateTotals(sess);
+}
+
+/* ---------------------------
+  Agregar manual
+----------------------------*/
+function addManualHandler(){
+  const sid = getCurrentSessionId();
+  if(!sid) return alert('Abra una mesa primero');
+  const name = prompt('Nombre del producto:');
+  if(!name) return;
+  const price = parseNum(prompt('Valor unitario (sin $):','0'));
+  if(isNaN(price)) return alert('Valor inválido');
+  const qty = parseInt(prompt('Cantidad:','1')) || 1;
+  const sess = sessions[sid];
+  if(sess.owner !== currentUser && role !== 'cajera' && role !== 'admin') return alert('No puede modificar esta comanda');
+  sess.items.push({ productId: null, name, price, qty });
+  saveState(); renderCart(sess); updateTotals(sess);
+}
+
+/* ---------------------------
+  Render carrito
+----------------------------*/
+function renderCart(sess){
+  const tbody = document.querySelector('#cartTable tbody');
+  tbody.innerHTML = '';
+  if(!sess || !sess.items || sess.items.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted">Sin items</td></tr>'; updateTotals(sess); return; }
+  sess.items.forEach((it, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="center">${it.productId || '-'}</td>
+      <td>${escapeHtml(it.name)}</td>
+      <td class="center"><input type="number" min="1" value="${it.qty}" data-idx="${idx}" class="qty-input" style="width:60px"></td>
+      <td class="right">${money(it.price)}</td>
+      <td class="right">${money(it.price * it.qty)}</td>
+      <td class="center"><button class="btn ghost small" data-remove="${idx}">Eliminar</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.qty-input').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      const idx = parseInt(e.target.dataset.idx);
+      const val = parseInt(e.target.value) || 0;
+      const sid = getCurrentSessionId();
+      if(!sid) return;
+      sessions[sid].items[idx].qty = val;
+      saveState(); renderCart(sessions[sid]);
+    });
+  });
+
+  tbody.querySelectorAll('[data-remove]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(e.target.dataset.remove);
+      const sid = getCurrentSessionId();
+      if(!sid) return;
+      sessions[sid].items.splice(idx,1);
+      saveState(); renderCart(sessions[sid]);
+    });
+  });
+
+  updateTotals(sess);
+}
+
+/* ---------------------------
+  Totales y propina
+----------------------------*/
+function updateTotals(sess){
+  const sid = sess ? sess.id : getCurrentSessionId();
+  if(!sid) { $('subtotal').innerText='$0'; $('grandTotal').innerText='$0'; return; }
+  const s = sessions[sid];
+  const subtotal = s.items.reduce((a,it)=> a + parseNum(it.price) * (parseInt(it.qty)||0), 0);
+  const tipPct = parseFloat($('tipPercent').value) || 0;
+  const tip = $('chkTip').checked ? Math.round(subtotal * (tipPct/100)) : 0;
+  s.tip = tip;
+  const total = subtotal + tip;
+  $('subtotal').innerText = money(subtotal);
+  $('grandTotal').innerText = money(total);
+}
+
+/* ---------------------------
+  Util: obtener sesión actual mostrada
+----------------------------*/
+function getCurrentSessionId(){
+  const label = $('sessionTable').innerText;
+  if(!label || label==='—') return null;
+  // buscar session que tenga visitLabel == label
+  for(const sid in sessions) if(sessions[sid].visitLabel === label) return sid;
+  // fallback: if table displayed with sessionId
+  const t = tables.find(tt => tt.id === label || (tt.id + (tt.visitCount>1?String.fromCharCode(64+(tt.visitCount-1)):'') ) === label);
+  if(t && t.sessionId) return t.sessionId;
+  return null;
+}
+
+/* ---------------------------
+  Cerrar sesión / marcar pagada
+----------------------------*/
+function closeSessionHandler(){
+  const sid = getCurrentSessionId();
+  if(!sid) return alert('No hay sesión abierta');
+  if(!confirm('¿Cerrar y marcar como pagada?')) return;
+  const s = sessions[sid];
+  s.closed = true; s.closedAt = new Date().toISOString();
+  const t = tables.find(tt => tt.id === s.tableId);
+  if(t){ t.occupied = false; t.sessionId = null; t.owner = null; }
+  saveState(); renderTables(); renderCounters();
+  $('sessionPanel').classList.add('hidden'); $('noSession').classList.remove('hidden');
+  alert('Cuenta cerrada. Total: ' + $('grandTotal').innerText);
+}
+
+/* ---------------------------
+  Forzar liberar (cajera/admin)
+----------------------------*/
+function forceReleaseHandler(){
+  if(role !== 'cajera' && role !== 'admin') return alert('Sólo cajera o admin puede forzar liberar');
+  const sid = getCurrentSessionId();
+  if(!sid) return alert('No hay sesión seleccionada');
+  const s = sessions[sid];
+  s.closed = true;
+  const t = tables.find(tt => tt.id === s.tableId);
+  if(t){ t.occupied = false; t.sessionId = null; t.owner = null; }
+  saveState(); renderTables(); renderCounters();
+  $('sessionPanel').classList.add('hidden'); $('noSession').classList.remove('hidden');
+  alert('Mesa liberada forzosamente');
+}
+
+/* ---------------------------
+  Imprimir Cuenta (POS 80mm)
+----------------------------*/
+function printTicketPOS(){
+  const sid = getCurrentSessionId();
+  if(!sid) return alert('Abra una mesa y agregue items antes de imprimir');
+  const sess = sessions[sid];
+  const now = new Date();
+  const fecha = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+  let itemsHtml = '';
+  sess.items.forEach(it => {
+    const line = parseNum(it.price) * (parseInt(it.qty)||0);
+    const name = String(it.name).slice(0,22);
+    itemsHtml += `<tr><td style="width:40px;text-align:center">${it.qty}</td><td style="padding-left:6px">${escapeHtml(name)}</td><td style="text-align:right">${money(line)}</td></tr>`;
+  });
+  const subtotal = sess.items.reduce((a,it)=> a + parseNum(it.price) * (parseInt(it.qty)||0), 0);
+  const tip = sess.tip !== null ? sess.tip : ($('chkTip').checked ? Math.round(subtotal * ((parseFloat($('tipPercent').value)||0)/100)) : 0);
+  const total = subtotal + tip;
+  const html = `
+    <html><head><title>Cuenta de Consumo</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+      @media print { @page{ size:80mm auto; margin:6mm } body{width:80mm;font-family:monospace;font-size:11px;color:#000} }
+      body{font-family:monospace;width:80mm;margin:0 auto;color:#000}.center{text-align:center}.bold{font-weight:700}img.logo{max-width:120px;display:block;margin:0 auto 6px}table{width:100%;border-collapse:collapse}td{padding:3px 0;vertical-align:top}.line{border-top:1px dashed #000;margin:6px 0}.right{text-align:right}.small{font-size:11px}
+    </style></head><body>
+    <div class="center"><img class="logo" src="logo_elvacilon1.png"><div class="bold">EL VACILÓN SALSA CLUB</div><div class="small">Carrera 23a # 7A - 15</div><div class="small">Cel: 3147159066 - 3136188889</div><div class="small">Instagram: @elvacilonclub</div><div class="line"></div><div class="bold">CUENTA DE CONSUMO</div><div class="small">Mesa: ${escapeHtml(sess.visitLabel || sess.tableId)} Fecha: ${escapeHtml(fecha)}</div><div class="line"></div></div>
+    <table>${itemsHtml}</table><div class="line"></div>
+    <table><tr><td>Subtotal:</td><td style="text-align:right">${money(subtotal)}</td></tr><tr><td>Propina:</td><td style="text-align:right">${money(tip)}</td></tr><tr><td class="bold">Total:</td><td style="text-align:right" class="bold">${money(total)}</td></tr></table>
+    <div style="margin-top:8px;text-align:center;font-weight:700">¡Gracias por su visita!</div><div style="text-align:center">El Vacilón Salsa Club</div></body></html>`;
+  const w = window.open('','_blank','width=400,height=700'); w.document.write(html); w.document.close();
+  setTimeout(()=> w.print(), 700);
+}
+
+/* ---------------------------
+  Imprimir lista de precios
+----------------------------*/
+function printPriceList(){
+  if(!products || products.length===0) return alert('Cargue la lista de precios primero (Seleccione día).');
+  const now = new Date().toLocaleString();
+  const rows = products.map(p => `<tr><td>${p.id}</td><td>${escapeHtml(p.nombre)}</td><td style="text-align:right">${money(p.precio)}</td></tr>`).join('');
+  const html = `<html><head><title>Lista de Precios</title><style>body{font-family:Montserrat, sans-serif;margin:20px;color:#000}.center{text-align:center}table{width:100%;border-collapse:collapse}th,td{padding:6px;border-bottom:1px solid #ddd}th{background:#f5e7c2}</style></head><body><div class="center"><img src="logo_elvacilon1.png" style="max-width:120px"><h2>El Vacilón Salsa Club</h2><div>${now}</div></div><table><thead><tr><th>#</th><th>Producto</th><th style="text-align:right">Valor</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+  const w = window.open('','_blank'); w.document.write(html); w.document.close(); w.print();
+}
+
+/* ---------------------------
+  Vista de Comandas (Cajera)
+----------------------------*/
+function showComandasView(){
+  if(role !== 'cajera') return alert('Solo cajera');
+  $('mesasContainer').classList.add('hidden');
+  $('historyContainer').classList.add('hidden');
+  $('comandasContainer').classList.remove('hidden');
+  renderComandasTable();
+}
+function showMesasView(){
+  $('comandasContainer').classList.add('hidden');
+  $('historyContainer').classList.add('hidden');
+  $('mesasContainer').classList.remove('hidden');
+}
+
+/* render comandas table */
+function renderComandasTable(){
+  const tbody = document.querySelector('#comandasTable tbody');
+  tbody.innerHTML = '';
+  const filter = document.querySelector('input[name="comFilter"]:checked')?.value || 'all';
+  let openCount = 0, closedCount = 0;
+  for(const sid in sessions){
+    const s = sessions[sid];
+    const subtotal = s.items.reduce((a,it)=> a + parseNum(it.price) * (parseInt(it.qty)||0), 0);
+    const tip = s.tip !== null ? s.tip : Math.round(subtotal * ((parseFloat($('tipPercent')?.value)||0)/100));
+    const total = subtotal + tip;
+    const state = s.closed ? 'CERRADA' : 'ABIERTA';
+    if(s.closed) closedCount++; else openCount++;
+    if(filter === 'open' && s.closed) continue;
+    if(filter === 'closed' && !s.closed) continue;
+    const tr = document.createElement('tr');
+    tr.style.background = s.closed ? 'rgba(216,255,221,0.6)' : 'rgba(255,220,220,0.7)';
+    tr.innerHTML = `<td>${escapeHtml(s.visitLabel || s.tableId)}</td>
+      <td>${escapeHtml(s.owner)}</td>
+      <td>${state}</td>
+      <td>${money(subtotal)}</td>
+      <td>${money(tip)}</td>
+      <td>${money(total)}</td>
+      <td>${new Date(s.createdAt).toLocaleString()}</td>
+      <td>
+        <button class="btn ghost small" data-sid="${s.id}" data-action="view">Ver / Imprimir</button>
+        <button class="btn primary small" data-sid="${s.id}" data-action="close">Cerrar</button>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+  $('comandasCounters').innerText = `Abiertas: ${openCount} / Cerradas: ${closedCount}`;
+
+  // attach actions
+  tbody.querySelectorAll('[data-action="view"]').forEach(b => b.addEventListener('click', (e)=>{
+    const sid = e.target.dataset.sid;
+    if(!sessions[sid]) return;
+    openSession(sid);
+  }));
+  tbody.querySelectorAll('[data-action="close"]').forEach(b => b.addEventListener('click', (e)=>{
+    const sid = e.target.dataset.sid;
+    if(!sessions[sid]) return;
+    if(!confirm('Cerrar y marcar como pagada?')) return;
+    sessions[sid].closed = true;
+    const t = tables.find(tt => tt.id === sessions[sid].tableId);
+    if(t){ t.occupied = false; t.sessionId = null; t.owner = null; }
+    saveState(); renderTables(); renderComandasTable(); renderCounters();
+  }));
+}
+
+/* ---------------------------
+  Historial de cierres (vista)
+----------------------------*/
+function showHistoryView(){
+  if(!(role === 'cajera' || role === 'admin')) return alert('No autorizado');
+  $('mesasContainer').classList.add('hidden');
+  $('comandasContainer').classList.add('hidden');
+  $('historyContainer').classList.remove('hidden');
+  renderHistoryTable();
+}
+function renderHistoryTable(){
+  const list = loadHistory();
+  const tbody = document.querySelector('#historyTable tbody');
+  tbody.innerHTML = '';
+  list.forEach((h, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${escapeHtml(h.date)}</td>
+      <td>${money(h.total)}</td>
+      <td>${h.count}</td>
+      <td>${escapeHtml(h.user)}</td>
+      <td>
+        <button class="btn ghost small" data-idx="${idx}" data-action="download">Descargar CSV</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+  $('historyCounters').innerText = `Registros: ${list.length}`;
+  tbody.querySelectorAll('[data-action="download"]').forEach(b => b.addEventListener('click', (e)=>{
+    const idx = parseInt(e.target.dataset.idx);
+    downloadHistoryCSV(idx);
+  }));
+}
+
+/* ---------------------------
+  Exportar cierre a CSV (Cajera y Admin)
+  - además guarda en historial localStorage
+----------------------------*/
+function exportCSVHandler(){
+  if(!(role === 'cajera' || role === 'admin')) return alert('No autorizado');
+  const rows = [['Fecha','Mesa','Mesero','Estado','Subtotal','Propina','Total']];
+  let totalDay = 0;
+  let closedCount = 0;
+  for(const sid in sessions){
+    const s = sessions[sid];
+    const subtotal = s.items.reduce((a,it)=> a + parseNum(it.price) * (parseInt(it.qty)||0), 0);
+    const tip = s.tip !== null ? s.tip : Math.round(subtotal * ((parseFloat($('tipPercent')?.value)||0)/100));
+    const total = subtotal + tip;
+    rows.push([ new Date(s.createdAt).toLocaleString(), s.visitLabel || s.tableId, s.owner, s.closed ? 'CERRADA' : 'ABIERTA', subtotal, tip, total ]);
+    totalDay += total;
+    if(s.closed) closedCount++;
+  }
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const filename = `cierre_dia_${new Date().toISOString().slice(0,10)}.csv`;
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+
+  // save to history storage
+  const history = loadHistory();
+  const record = { date: new Date().toLocaleString(), total: totalDay, count: closedCount, user: currentUser, filename, csv };
+  history.unshift(record); // newest first
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  alert('Cierre exportado y guardado en historial: ' + filename);
+  renderHistoryTable();
+}
+
+/* load history */
+function loadHistory(){ try { const raw = localStorage.getItem(HISTORY_KEY); return raw ? JSON.parse(raw) : []; } catch(e){return [];} }
+
+/* download a saved CSV from history */
+function downloadHistoryCSV(idx){
+  const list = loadHistory();
+  if(!list[idx]) return alert('Registro no encontrado');
+  const url = URL.createObjectURL(new Blob([list[idx].csv], { type: 'text/csv' }));
+  const a = document.createElement('a'); a.href = url; a.download = list[idx].filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------------------------
+  Cerrar día (admin) - libera todo y marca cerrado
+----------------------------*/
+function closeDayHandler(){
+  if(role !== 'admin') return alert('Solo administrador');
+  if(!confirm('Confirmar cierre del día?')) return;
+  for(const sid in sessions){
+    sessions[sid].closed = true;
+    sessions[sid].closedAt = new Date().toISOString();
+  }
+  tables.forEach(t => { t.occupied=false; t.sessionId=null; t.owner=null; t.visitCount = t.visitCount || 0; });
+  saveState(); renderTables(); renderCounters();
+  alert('Día cerrado y mesas liberadas.');
+}
+
+/* ---------------------------
+  Restaurar sistema (admin)
+----------------------------*/
+function restoreSystemHandler(){
+  if(role !== 'admin') return alert('Solo administrador');
+  if(!confirm('Restaurar sistema eliminará todas las sesiones, mesas ocupadas y el historial. ¿Continuar?')) return;
+  localStorage.removeItem(STATE_KEY);
+  localStorage.removeItem(HISTORY_KEY);
+  // reset in-memory
+  initTables(); sessions = {}; products = [];
+  saveState(); renderTables(); renderCounters();
+  showMesasView();
+  alert('Sistema restaurado correctamente.');
+}
+
+/* ---------------------------
+  Abrir manual
+----------------------------*/
+function manualOpen(){
+  const val = $('manualTable').value.trim();
+  if(!val) return alert('Ingrese número de mesa o barra');
+  const base = val.replace(/[A-Z]+$/,'');
+  const t = tables.find(tt => tt.id === base);
+  if(t) onTableClick(t.id);
+  else alert('Mesa no válida');
+}
+
+/* ---------------------------
+  Persistencia (localStorage)
+----------------------------*/
+function saveState(){
+  try {
+    localStorage.setItem(STATE_KEY, JSON.stringify({ tables, sessions, products }));
+  } catch(e){ console.error(e); }
+}
+function loadState(){
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    if(!raw) return;
+    const obj = JSON.parse(raw);
+    if(obj.tables){
+      obj.tables.forEach(saved => {
+        const t = tables.find(tt => tt.id === saved.id);
+        if(t){
+          t.occupied = saved.occupied;
+          t.sessionId = saved.sessionId;
+          t.owner = saved.owner;
+          t.visitCount = saved.visitCount || 0;
+        }
       });
-      $('productsPanel').classList.remove('hidden');
     }
+    if(obj.sessions) sessions = obj.sessions;
+    if(obj.products) products = obj.products;
+  } catch(e){ console.error(e); }
+}
 
-    // ======== IMPRIMIR LISTA DE PRECIOS ========
-    $('btnPrintPriceList').addEventListener('click', () => {
-      if (products.length === 0) return alert('Primero cargue la lista de precios');
-      const fecha = new Date().toLocaleString();
-      let filas = products.map(p => `<tr><td>${p.id}</td><td>${p.nombre}</td><td style="text-align:right">${money(p.precio)}</td></tr>`).join('');
-      const html = `
-      <html><head><title>Lista de Precios</title>
-      <style>
-        body { font-family: Montserrat, sans-serif; margin: 10px; color: #000; }
-        h2 { text-align:center; }
-        table { width:100%; border-collapse:collapse; margin-top:10px; }
-        th,td { padding:4px; border-bottom:1px solid #ccc; }
-        th { background:#f0d98a; }
-        img { display:block; margin:0 auto; width:100px; }
-        .meta { text-align:center; font-size:12px; }
-      </style></head><body>
-        <img src="logo_elvacilon1.png" alt="logo">
-        <h2>El Vacilón Salsa Club</h2>
-        <div class="meta">Carrera 23a #7A-15 — Cel: 3147159066 / 3136188889</div>
-        <div class="meta">Instagram: @elvacilonclub</div>
-        <div class="meta">Fecha: ${fecha}</div>
-        <table><thead><tr><th>#</th><th>Producto</th><th>Valor</th></tr></thead><tbody>${filas}</tbody></table>
-      </body></html>`;
-      const w = window.open('', '_blank');
-      w.document.write(html);
-      w.document.close();
-      w.print();
-    });
-  </script>
+/* ---------------------------
+  Guard: persistir antes de cerrar
+----------------------------*/
+window.addEventListener('beforeunload', () => saveState());
+
+</script>
 </body>
 </html>
+
