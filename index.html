@@ -686,10 +686,6 @@ function renderComandasTable(){
   tbody.innerHTML = '';
   const filter = document.querySelector('input[name="comFilter"]:checked')?.value || 'all';
   let openCount = 0, closedCount = 0;
-
-  // --- Nueva estructura para acumular ventas por mesero ---
-  const resumenMeseros = {}; // { mesero: {subtotal, propina, total} }
-
   for(const sid in sessions){
     const s = sessions[sid];
     const subtotal = s.items.reduce((a,it)=> a + parseNum(it.price) * (parseInt(it.qty)||0), 0);
@@ -697,17 +693,8 @@ function renderComandasTable(){
     const total = subtotal + tip;
     const state = s.closed ? 'CERRADA' : 'ABIERTA';
     if(s.closed) closedCount++; else openCount++;
-
-    // --- acumular por mesero ---
-    const name = s.owner || '—';
-    if(!resumenMeseros[name]) resumenMeseros[name] = { subtotal:0, propina:0, total:0 };
-    resumenMeseros[name].subtotal += subtotal;
-    resumenMeseros[name].propina += tip;
-    resumenMeseros[name].total += total;
-
     if(filter === 'open' && s.closed) continue;
     if(filter === 'closed' && !s.closed) continue;
-
     const tr = document.createElement('tr');
     tr.style.background = s.closed ? 'rgba(216,255,221,0.6)' : 'rgba(255,220,220,0.7)';
     tr.innerHTML = `<td>${escapeHtml(s.visitLabel || s.tableId)}</td>
@@ -723,76 +710,41 @@ function renderComandasTable(){
       </td>`;
     tbody.appendChild(tr);
   }
-
   $('comandasCounters').innerText = `Abiertas: ${openCount} / Cerradas: ${closedCount}`;
 
-  // --- mostrar resumen debajo de la tabla ---
-  const resumenDivId = 'resumenMeseros';
-  let resumenDiv = document.getElementById(resumenDivId);
-  if(!resumenDiv){
-    resumenDiv = document.createElement('div');
-    resumenDiv.id = resumenDivId;
-    document.querySelector('#comandasContainer').appendChild(resumenDiv);
-  }
+  // attach actions
+  tbody.querySelectorAll('[data-action="view"]').forEach(b => b.addEventListener('click', (e)=>{ const sid = e.target.dataset.sid; if(!sessions[sid]) return; openSession(sid); }));
+  tbody.querySelectorAll('[data-action="close"]').forEach(b => b.addEventListener('click', (e)=>{ const sid = e.target.dataset.sid; if(!sessions[sid]) return; if(!confirm('Cerrar y marcar como pagada?')) return; sessions[sid].closed = true; const t = tables.find(tt => tt.id === sessions[sid].tableId); if(t){ t.occupied = false; t.sessionId = null; t.owner = null; } saveState(); renderTables(); renderComandasTable(); renderCounters(); }));
+}
 
-  // Generar tabla de resumen
-  let htmlResumen = `
-    <h4 style="margin-top:16px;">Resumen de ventas por mesero/cajera</h4>
-    <table class="striped" style="margin-top:6px;">
-      <thead>
-        <tr><th>Usuario</th><th>Subtotal</th><th>Propina</th><th>Total Vendido</th><th>Pagado</th><th>Por Pagar</th></tr>
-      </thead><tbody>
-  `;
+/* ============================
+   Historial de cierres (Cajera/Admin)
+============================*/
+function showHistoryView(){
+  if(!(role === 'cajera' || role === 'admin')) return alert('No autorizado');
+  $('mesasContainer').classList.add('hidden');
+  $('comandasContainer').classList.add('hidden');
+  $('historyContainer').classList.remove('hidden');
+  renderHistoryTable();
+}
 
-  Object.keys(resumenMeseros).forEach(name=>{
-    const r = resumenMeseros[name];
-    htmlResumen += `
-      <tr>
-        <td>${escapeHtml(name)}</td>
-        <td>${money(r.subtotal)}</td>
-        <td>${money(r.propina)}</td>
-        <td>${money(r.total)}</td>
-        <td><input type="number" min="0" id="pagado_${name}" value="0" style="width:90px"></td>
-        <td id="falta_${name}">${money(r.total)}</td>
-      </tr>
-    `;
+function renderHistoryTable(){
+  const list = loadHistory();
+  const tbody = document.querySelector('#historyTable tbody');
+  tbody.innerHTML = '';
+  list.forEach((h, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${escapeHtml(h.date)}</td>
+      <td>${money(h.total)}</td>
+      <td>${h.count}</td>
+      <td>${escapeHtml(h.user)}</td>
+      <td>
+        <button class="btn ghost small" data-idx="${idx}" data-action="download">Descargar CSV</button>
+      </td>`;
+    tbody.appendChild(tr);
   });
-  htmlResumen += `</tbody></table>
-    <p class="muted small">💡 Puede registrar el monto que ya pagó cada mesero; el sistema calculará automáticamente cuánto falta por cuadrar.</p>
-  `;
-  resumenDiv.innerHTML = htmlResumen;
-
-  // eventos de actualización de pagos
-  Object.keys(resumenMeseros).forEach(name=>{
-    const input = document.getElementById('pagado_'+name);
-    const faltaCell = document.getElementById('falta_'+name);
-    input.addEventListener('input', ()=>{
-      const pagado = parseNum(input.value);
-      const total = resumenMeseros[name].total;
-      const falta = total - pagado;
-      faltaCell.textContent = money(falta);
-      faltaCell.style.color = (falta <= 0) ? 'green' : 'red';
-    });
-  });
-
-  // attach actions (ver / cerrar)
-  tbody.querySelectorAll('[data-action="view"]').forEach(b => b.addEventListener('click', (e)=>{ 
-    const sid = e.target.dataset.sid; 
-    if(!sessions[sid]) return; 
-    openSession(sid); 
-  }));
-  tbody.querySelectorAll('[data-action="close"]').forEach(b => b.addEventListener('click', (e)=>{ 
-    const sid = e.target.dataset.sid; 
-    if(!sessions[sid]) return; 
-    if(!confirm('Cerrar y marcar como pagada?')) return; 
-    sessions[sid].closed = true; 
-    const t = tables.find(tt => tt.id === sessions[sid].tableId); 
-    if(t){ t.occupied = false; t.sessionId = null; t.owner = null; } 
-    saveState(); 
-    renderTables(); 
-    renderComandasTable(); 
-    renderCounters(); 
-  }));
+  $('historyCounters').innerText = `Registros: ${list.length}`;
+  tbody.querySelectorAll('[data-action="download"]').forEach(b => b.addEventListener('click', (e)=>{ const idx = parseInt(e.target.dataset.idx); downloadHistoryCSV(idx); }));
 }
 
 /* ============================
