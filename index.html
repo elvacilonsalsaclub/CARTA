@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>El Vacilón Salsa Club — Sistema</title>
 
-  <!-- Fuente -->
+  <!-- Montserrat -->
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 
@@ -14,16 +14,21 @@
 </head>
 <body>
 
-  <!-- LOGIN STAGE: video de fondo + logo animado + fade-in -->
+  <!-- =========================
+       PANTALLA DE LOGIN (VIDEO + LOGO)
+       - El modal de selección de día NO aparece automáticamente.
+       - Video se muestra solo durante login.
+     ========================= -->
   <div id="login-stage">
     <div id="videoWrapper">
       <video id="bgVideo" autoplay muted loop playsinline>
         <source src="video_elvacilon1.mp4" type="video/mp4">
+        Tu navegador no soporta video de fondo.
       </video>
     </div>
 
     <div id="loginOverlay" class="fade-in">
-      <img id="logo" src="logo_elvacilon1.png" alt="El Vacilón Logo">
+      <img id="logo" src="logo_elvacilon1.png" alt="Logo El Vacilón">
       <h1 id="brandTitle">El Vacilón <span>Salsa Club</span></h1>
 
       <div id="loginBox">
@@ -31,14 +36,16 @@
         <input id="inputPass" type="password" placeholder="Contraseña" autocomplete="current-password">
         <div class="row">
           <button id="btnLogin" class="btn primary">Ingresar</button>
-          <button id="btnDemo" class="btn ghost">Demo</button>
+          <button id="btnDemo" class="btn ghost" title="Rellenar con usuario demo">Demo</button>
         </div>
         <p class="muted small">© 2025 El Vacilón Salsa Club — Carrera 23a #7A - 15 — @elvacilonclub</p>
       </div>
     </div>
   </div>
 
-  <!-- APP (oculto hasta login) -->
+  <!-- =========================
+       APLICACIÓN (OCULTA HASTA LOGIN)
+     ========================= -->
   <div id="app" class="hidden app-container">
     <header class="app-header">
       <div class="header-left">
@@ -53,6 +60,7 @@
         <div id="clock" class="muted small">--:--:--</div>
         <div id="counters" class="muted small">Ocupadas: 0 / Libres: 32</div>
 
+        <!-- Botones de control (visibilidad por rol se maneja en JS) -->
         <button id="btnSelectDay" class="btn ghost hidden" title="Cargar precios desde archivos">Seleccione día</button>
         <button id="btnPrintPriceList" class="btn ghost">Imprimir lista</button>
         <button id="btnViewComandas" class="btn ghost hidden">Ver Comandas</button>
@@ -65,7 +73,7 @@
     </header>
 
     <main class="main-grid">
-      <!-- izquierda: mesas (o tabla de comandas / historial si activo) -->
+      <!-- IZQUIERDA: mesas / comandas / historial (se alternan) -->
       <section class="left-panel">
         <div id="mesasContainer">
           <h3>Mesas y Barras</h3>
@@ -112,7 +120,7 @@
         </div>
       </section>
 
-      <!-- derecha: comanda / carrito -->
+      <!-- DERECHA: comanda / carrito -->
       <aside class="right-panel">
         <h3>Comanda</h3>
 
@@ -170,23 +178,28 @@
     </main>
   </div>
 
-  <!-- MODAL: seleccionar día de precios -->
+  <!-- =========================
+       MODAL: seleccionar día de precios (OCULTO POR DEFECTO)
+       - Se mostrará SOLO cuando el usuario pulse el botón "Seleccione día"
+     ========================= -->
   <div id="modalDay" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-box">
       <h3>Seleccione día de precios</h3>
       <label class="radio"><input type="radio" name="dayPrice" value="JVS.xlsx" checked> Día normal (JVS.xlsx)</label>
       <label class="radio"><input type="radio" name="dayPrice" value="DOMINGO.xlsx"> Domingo (DOMINGO.xlsx)</label>
-      <div class="modal-actions">
+      <div class="modal-actions" style="margin-top:12px">
         <button id="btnLoadPrices" class="btn primary">Cargar precios</button>
         <button id="btnCancelModal" class="btn ghost">Cancelar</button>
       </div>
     </div>
   </div>
 
+  <!-- Parte 1: termina aquí; continuación del script en Parte 2/3 -->
 <script>
 /* ============================
-  Usuarios: usuario:contraseña
-============================ */
+   Configuración de usuarios
+   usuario: contraseña
+   ============================ */
 const USERS = {
   alex: '123',
   santiago: '456',
@@ -197,38 +210,43 @@ const USERS = {
 };
 
 /* ---------------------------
-  Estado global
+   Claves de localStorage
+----------------------------*/
+const STATE_KEY = 'ev_state_final_v2';
+const HISTORY_KEY = 'ev_history_v1';
+
+/* ---------------------------
+   Estado global en memoria
 ----------------------------*/
 let currentUser = null;
-let role = null;
-let products = []; // {id,nombre,precio}
-let tables = [];   // {id,type,occupied,sessionId,owner,visitCount}
-let sessions = {}; // sessionId -> {id,tableId,owner,items,createdAt,closed,visitLabel,tip}
+let role = null; // 'mesero' | 'cajera' | 'admin'
+let products = []; // [{id,nombre,precio}]
+let tables = [];   // [{id,type,occupied,sessionId,owner,visitCount}]
+let sessions = {}; // { sessionId: { id, tableId, owner, items[], createdAt, closed, visitLabel, tip } }
 
-/* historial de cierres guardado en localStorage: array de {date,total, count, user, filename, csv} */
-const HISTORY_KEY = 'ev_history_v1';
-const STATE_KEY = 'ev_state_final_v2';
-
-/* helpers */
+/* ---------------------------
+   Helpers DOM & util
+----------------------------*/
 const $ = id => document.getElementById(id);
+const q = s => document.querySelector(s);
 const money = n => '$' + Number(Math.round(n)).toLocaleString();
 const parseNum = v => Number(String(v||0).replace(/[^0-9.\-]/g,'')) || 0;
 const escapeHtml = s => String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
 /* ---------------------------
-  Init UI
+   Inicialización al cargar DOM
 ----------------------------*/
 document.addEventListener('DOMContentLoaded', () => {
-  initTables();
-  bindUI();
-  loadState();
-  renderTables();
-  renderCounters();
-  startClock();
+  initTables();        // crear 28 mesas + 4 barras
+  bindUI();            // asignar eventos a botones
+  loadState();         // cargar estado desde localStorage (si existe)
+  renderTables();      // dibujar cuadrícula
+  renderCounters();    // contador ocupadas/libres
+  startClock();        // iniciar reloj
 });
 
 /* ---------------------------
-  Clock
+   Start clock (header)
 ----------------------------*/
 function startClock(){
   const el = $('clock');
@@ -244,7 +262,7 @@ function startClock(){
 function capitalize(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
 
 /* ---------------------------
-  Crear tablas (28 mesas + 4 barras)
+   Crear 28 mesas + 4 barras
 ----------------------------*/
 function initTables(){
   tables = [];
@@ -253,22 +271,17 @@ function initTables(){
 }
 
 /* ---------------------------
-  UI events binding
+   Bind UI events
 ----------------------------*/
 function bindUI(){
+  // Login
   $('btnLogin').addEventListener('click', onLogin);
   $('btnDemo').addEventListener('click', ()=> { $('inputUser').value='alex'; $('inputPass').value='123'; onLogin(); });
+
+  // App-level buttons (visibility toggled on login)
   $('btnLogout').addEventListener('click', ()=> location.reload());
-  $('btnSelectDay').addEventListener('click', ()=> showModal());
+  $('btnSelectDay').addEventListener('click', ()=> { $('modalDay').classList.remove('hidden'); });
   $('btnPrintPriceList').addEventListener('click', printPriceList);
-  $('btnLoadPrices').addEventListener('click', async ()=> { await loadSelectedPrices(); hideModal(); renderProductsSmall(); alert('Productos cargados: ' + products.length); });
-  $('btnCancelModal').addEventListener('click', hideModal);
-  $('btnOpenManual').addEventListener('click', manualOpen);
-  $('btnAddByNumber')?.addEventListener('click', addByNumberHandler);
-  $('btnAddManual')?.addEventListener('click', addManualHandler);
-  $('btnPrintTicket').addEventListener('click', printTicketPOS);
-  $('btnCloseSession').addEventListener('click', closeSessionHandler);
-  $('btnForceRelease').addEventListener('click', forceReleaseHandler);
   $('btnViewComandas').addEventListener('click', showComandasView);
   $('btnBackToMesas').addEventListener('click', showMesasView);
   $('btnViewHistory').addEventListener('click', showHistoryView);
@@ -277,11 +290,36 @@ function bindUI(){
   $('btnCloseDay').addEventListener('click', closeDayHandler);
   $('btnRestore').addEventListener('click', restoreSystemHandler);
 
+  // Modal price load
+  $('btnLoadPrices').addEventListener('click', async () => {
+    const file = document.querySelector('input[name="dayPrice"]:checked')?.value || 'JVS.xlsx';
+    try {
+      await loadProductsFromExcel(file);
+      $('modalDay').classList.add('hidden');
+      renderProductsSmall();
+      alert(`Cargados ${products.length} productos desde ${file}`);
+    } catch(e){
+      alert('Error cargando archivo: ' + e.message);
+    }
+  });
+  $('btnCancelModal').addEventListener('click', ()=> $('modalDay').classList.add('hidden'));
+
+  // Manual open table
+  $('btnOpenManual').addEventListener('click', manualOpen);
+
+  // Cart controls (delegated when session opens)
+  $('btnAddByNumber')?.addEventListener('click', addByNumberHandler);
+  $('btnAddManual')?.addEventListener('click', addManualHandler);
+  $('btnPrintTicket')?.addEventListener('click', printTicketPOS);
+  $('btnCloseSession')?.addEventListener('click', closeSessionHandler);
+  $('btnForceRelease')?.addEventListener('click', forceReleaseHandler);
+
+  // Filters in comandas
   document.querySelectorAll('input[name="comFilter"]').forEach(r => r.addEventListener('change', renderComandasTable));
 }
 
 /* ---------------------------
-  Login
+   Login handler
 ----------------------------*/
 function onLogin(){
   const u = $('inputUser').value.trim().toLowerCase();
@@ -292,24 +330,24 @@ function onLogin(){
   currentUser = u;
   role = (u === 'cajera') ? 'cajera' : (u === 'admin') ? 'admin' : 'mesero';
 
-  // show app, hide login stage and video
-  document.getElementById('login-stage').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
+  // Hide login, show app
+  $('login-stage').classList.add('hidden');
+  $('app').classList.remove('hidden');
 
-  // show/hide buttons by role
+  // show/hide buttons depending on role
   if(role !== 'admin') $('btnSelectDay').classList.remove('hidden'); else $('btnSelectDay').classList.add('hidden');
   if(role === 'cajera') $('btnViewComandas').classList.remove('hidden'); else $('btnViewComandas').classList.add('hidden');
   if(role === 'cajera' || role === 'admin') $('btnExportCSV').classList.remove('hidden'); else $('btnExportCSV').classList.add('hidden');
   if(role === 'admin') { $('btnCloseDay').classList.remove('hidden'); $('btnRestore').classList.remove('hidden'); } else { $('btnCloseDay').classList.add('hidden'); $('btnRestore').classList.add('hidden'); }
-  // View history available to cajera and admin
   if(role === 'cajera' || role === 'admin') $('btnViewHistory').classList.remove('hidden'); else $('btnViewHistory').classList.add('hidden');
 
   $('userInfo').innerText = `${currentUser} — ${role}`;
-  renderTables(); renderCounters();
+  renderTables();
+  renderCounters();
 }
 
 /* ---------------------------
-  Render cuadrícula de mesas
+   Render cuadrícula de mesas
 ----------------------------*/
 function renderTables(){
   const grid = $('tablesGrid');
@@ -331,7 +369,7 @@ function renderTables(){
 }
 
 /* ---------------------------
-  Contadores
+   Render counters (ocupadas/libres)
 ----------------------------*/
 function renderCounters(){
   const total = tables.length;
@@ -341,7 +379,7 @@ function renderCounters(){
 }
 
 /* ---------------------------
-  Click mesa -> abrir/comprobar permissions
+   Click en mesa: abrir o bloquear segun rol
 ----------------------------*/
 function onTableClick(tableId){
   const t = tables.find(x => x.id === tableId);
@@ -351,12 +389,12 @@ function onTableClick(tableId){
     alert(`Mesa ocupada por ${t.owner}. No puede tomar pedidos.`);
     return;
   }
-  // if already has session -> open
+  // if already has session -> open it
   if(t.occupied && t.sessionId){
     openSession(t.sessionId);
     return;
   }
-  // else create session and assign to user
+  // else create a new session assigned to currentUser
   if(!currentUser) return alert('Inicie sesión primero');
   const sid = 's_' + Math.random().toString(36).slice(2,9);
   t.visitCount = (t.visitCount || 0) + 1;
@@ -365,11 +403,14 @@ function onTableClick(tableId){
   const sess = { id: sid, tableId: t.id, owner: currentUser, items: [], createdAt: new Date().toISOString(), closed:false, visitLabel, tip: null };
   sessions[sid] = sess;
   t.occupied = true; t.sessionId = sid; t.owner = currentUser;
-  saveState(); renderTables(); renderCounters(); openSession(sid);
+  saveState();
+  renderTables();
+  renderCounters();
+  openSession(sid);
 }
 
 /* ---------------------------
-  Abrir sesión en panel derecho
+   Abrir sesión (mostrar en panel derecho)
 ----------------------------*/
 function openSession(sessionId){
   const sess = sessions[sessionId];
@@ -388,13 +429,9 @@ function openSession(sessionId){
 }
 
 /* ---------------------------
-  Carga de productos desde Excel (fetch + SheetJS)
+   Cargar productos desde archivo Excel (SheetJS)
+   - filename: 'JVS.xlsx' o 'DOMINGO.xlsx' (ubicados en misma carpeta)
 ----------------------------*/
-async function loadSelectedPrices(){
-  const file = document.querySelector('input[name="dayPrice"]:checked')?.value || 'JVS.xlsx';
-  await loadProductsFromExcel(file);
-  hideModal();
-}
 async function loadProductsFromExcel(filename){
   try {
     const res = await fetch(filename);
@@ -417,19 +454,21 @@ async function loadProductsFromExcel(filename){
     }).filter(p => p.nombre);
     saveState();
   } catch(e){
-    console.error(e); throw e;
+    console.error(e);
+    throw e;
   }
 }
-function showModal(){ $('modalDay').classList.remove('hidden'); }
-function hideModal(){ $('modalDay').classList.add('hidden'); }
 
 /* ---------------------------
-  Render tabla pequeña de productos
+   Render mini tabla de productos
 ----------------------------*/
 function renderProductsSmall(){
   const tbody = document.querySelector('#productsTableSmall tbody');
   tbody.innerHTML = '';
-  if(!products || products.length===0) { tbody.innerHTML = '<tr><td colspan="3" class="muted">No hay productos (cargue lista)</td></tr>'; return; }
+  if(!products || products.length===0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="muted">No hay productos cargados</td></tr>';
+    return;
+  }
   products.forEach(p => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td class="center">${p.id}</td><td>${escapeHtml(p.nombre)}</td><td class="right">${money(p.precio)}</td>`;
@@ -438,8 +477,18 @@ function renderProductsSmall(){
 }
 
 /* ---------------------------
-  Agregar por número
+   Parte 2 termina aquí.
+   En la PARTE 3/3: funciones de carrito (agregar, editar, eliminar),
+   totales y propina, impresión (POS 80mm), vista comandas, historial,
+   export CSV, cierre día, restaurar sistema, persistencia final y listeners.
 ----------------------------*/
+</script>
+<script>
+/* ============================
+   Funciones de carrito / comanda
+============================*/
+
+/* Agregar por número (usando la tabla cargada) */
 function addByNumberHandler(){
   const num = parseInt($('prodNumber').value);
   const qty = parseInt($('prodQty').value) || 1;
@@ -455,9 +504,7 @@ function addByNumberHandler(){
   saveState(); renderCart(sess); updateTotals(sess);
 }
 
-/* ---------------------------
-  Agregar manual
-----------------------------*/
+/* Agregar manual (nombre + precio) */
 function addManualHandler(){
   const sid = getCurrentSessionId();
   if(!sid) return alert('Abra una mesa primero');
@@ -472,13 +519,15 @@ function addManualHandler(){
   saveState(); renderCart(sess); updateTotals(sess);
 }
 
-/* ---------------------------
-  Render carrito
-----------------------------*/
+/* Render carrito en panel derecho */
 function renderCart(sess){
   const tbody = document.querySelector('#cartTable tbody');
   tbody.innerHTML = '';
-  if(!sess || !sess.items || sess.items.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted">Sin items</td></tr>'; updateTotals(sess); return; }
+  if(!sess || !sess.items || sess.items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="muted">Sin items</td></tr>';
+    updateTotals(sess);
+    return;
+  }
   sess.items.forEach((it, idx) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td class="center">${it.productId || '-'}</td>
@@ -490,6 +539,7 @@ function renderCart(sess){
     tbody.appendChild(tr);
   });
 
+  // qty change handlers
   tbody.querySelectorAll('.qty-input').forEach(inp => {
     inp.addEventListener('change', (e) => {
       const idx = parseInt(e.target.dataset.idx);
@@ -501,6 +551,7 @@ function renderCart(sess){
     });
   });
 
+  // remove handlers
   tbody.querySelectorAll('[data-remove]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const idx = parseInt(e.target.dataset.remove);
@@ -514,12 +565,10 @@ function renderCart(sess){
   updateTotals(sess);
 }
 
-/* ---------------------------
-  Totales y propina
-----------------------------*/
+/* Totales y propina */
 function updateTotals(sess){
   const sid = sess ? sess.id : getCurrentSessionId();
-  if(!sid) { $('subtotal').innerText='$0'; $('grandTotal').innerText='$0'; return; }
+  if(!sid) { $('subtotal').innerText = '$0'; $('grandTotal').innerText = '$0'; return; }
   const s = sessions[sid];
   const subtotal = s.items.reduce((a,it)=> a + parseNum(it.price) * (parseInt(it.qty)||0), 0);
   const tipPct = parseFloat($('tipPercent').value) || 0;
@@ -530,23 +579,18 @@ function updateTotals(sess){
   $('grandTotal').innerText = money(total);
 }
 
-/* ---------------------------
-  Util: obtener sesión actual mostrada
-----------------------------*/
+/* Obtener la sesión actual mostrada en el panel (por label) */
 function getCurrentSessionId(){
   const label = $('sessionTable').innerText;
-  if(!label || label==='—') return null;
-  // buscar session que tenga visitLabel == label
+  if(!label || label === '—') return null;
   for(const sid in sessions) if(sessions[sid].visitLabel === label) return sid;
-  // fallback: if table displayed with sessionId
+  // fallback: buscar tabla con sessionId
   const t = tables.find(tt => tt.id === label || (tt.id + (tt.visitCount>1?String.fromCharCode(64+(tt.visitCount-1)):'') ) === label);
   if(t && t.sessionId) return t.sessionId;
   return null;
 }
 
-/* ---------------------------
-  Cerrar sesión / marcar pagada
-----------------------------*/
+/* Cerrar sesión (pagar) */
 function closeSessionHandler(){
   const sid = getCurrentSessionId();
   if(!sid) return alert('No hay sesión abierta');
@@ -560,9 +604,7 @@ function closeSessionHandler(){
   alert('Cuenta cerrada. Total: ' + $('grandTotal').innerText);
 }
 
-/* ---------------------------
-  Forzar liberar (cajera/admin)
-----------------------------*/
+/* Forzar liberar mesa (cajera/admin) */
 function forceReleaseHandler(){
   if(role !== 'cajera' && role !== 'admin') return alert('Sólo cajera o admin puede forzar liberar');
   const sid = getCurrentSessionId();
@@ -576,9 +618,9 @@ function forceReleaseHandler(){
   alert('Mesa liberada forzosamente');
 }
 
-/* ---------------------------
-  Imprimir Cuenta (POS 80mm)
-----------------------------*/
+/* ============================
+   Impresión POS (80mm)
+============================*/
 function printTicketPOS(){
   const sid = getCurrentSessionId();
   if(!sid) return alert('Abra una mesa y agregue items antes de imprimir');
@@ -594,6 +636,7 @@ function printTicketPOS(){
   const subtotal = sess.items.reduce((a,it)=> a + parseNum(it.price) * (parseInt(it.qty)||0), 0);
   const tip = sess.tip !== null ? sess.tip : ($('chkTip').checked ? Math.round(subtotal * ((parseFloat($('tipPercent').value)||0)/100)) : 0);
   const total = subtotal + tip;
+
   const html = `
     <html><head><title>Cuenta de Consumo</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>
       @media print { @page{ size:80mm auto; margin:6mm } body{width:80mm;font-family:monospace;font-size:11px;color:#000} }
@@ -607,9 +650,7 @@ function printTicketPOS(){
   setTimeout(()=> w.print(), 700);
 }
 
-/* ---------------------------
-  Imprimir lista de precios
-----------------------------*/
+/* Imprimir lista de precios (carta) */
 function printPriceList(){
   if(!products || products.length===0) return alert('Cargue la lista de precios primero (Seleccione día).');
   const now = new Date().toLocaleString();
@@ -618,9 +659,9 @@ function printPriceList(){
   const w = window.open('','_blank'); w.document.write(html); w.document.close(); w.print();
 }
 
-/* ---------------------------
-  Vista de Comandas (Cajera)
-----------------------------*/
+/* ============================
+   Vista de comandas (Cajera)
+============================*/
 function showComandasView(){
   if(role !== 'cajera') return alert('Solo cajera');
   $('mesasContainer').classList.add('hidden');
@@ -628,13 +669,7 @@ function showComandasView(){
   $('comandasContainer').classList.remove('hidden');
   renderComandasTable();
 }
-function showMesasView(){
-  $('comandasContainer').classList.add('hidden');
-  $('historyContainer').classList.add('hidden');
-  $('mesasContainer').classList.remove('hidden');
-}
 
-/* render comandas table */
 function renderComandasTable(){
   const tbody = document.querySelector('#comandasTable tbody');
   tbody.innerHTML = '';
@@ -683,9 +718,9 @@ function renderComandasTable(){
   }));
 }
 
-/* ---------------------------
-  Historial de cierres (vista)
-----------------------------*/
+/* ============================
+   Historial de cierres (Cajera/Admin)
+============================*/
 function showHistoryView(){
   if(!(role === 'cajera' || role === 'admin')) return alert('No autorizado');
   $('mesasContainer').classList.add('hidden');
@@ -693,6 +728,7 @@ function showHistoryView(){
   $('historyContainer').classList.remove('hidden');
   renderHistoryTable();
 }
+
 function renderHistoryTable(){
   const list = loadHistory();
   const tbody = document.querySelector('#historyTable tbody');
@@ -715,10 +751,9 @@ function renderHistoryTable(){
   }));
 }
 
-/* ---------------------------
-  Exportar cierre a CSV (Cajera y Admin)
-  - además guarda en historial localStorage
-----------------------------*/
+/* ============================
+   Exportar cierre a CSV (y guardar en historial)
+============================*/
 function exportCSVHandler(){
   if(!(role === 'cajera' || role === 'admin')) return alert('No autorizado');
   const rows = [['Fecha','Mesa','Mesero','Estado','Subtotal','Propina','Total']];
@@ -753,7 +788,7 @@ function exportCSVHandler(){
 /* load history */
 function loadHistory(){ try { const raw = localStorage.getItem(HISTORY_KEY); return raw ? JSON.parse(raw) : []; } catch(e){return [];} }
 
-/* download a saved CSV from history */
+/* download saved CSV from history */
 function downloadHistoryCSV(idx){
   const list = loadHistory();
   if(!list[idx]) return alert('Registro no encontrado');
@@ -762,9 +797,9 @@ function downloadHistoryCSV(idx){
   URL.revokeObjectURL(url);
 }
 
-/* ---------------------------
-  Cerrar día (admin) - libera todo y marca cerrado
-----------------------------*/
+/* ============================
+   Cerrar día (admin)
+============================*/
 function closeDayHandler(){
   if(role !== 'admin') return alert('Solo administrador');
   if(!confirm('Confirmar cierre del día?')) return;
@@ -777,24 +812,23 @@ function closeDayHandler(){
   alert('Día cerrado y mesas liberadas.');
 }
 
-/* ---------------------------
-  Restaurar sistema (admin)
-----------------------------*/
+/* ============================
+   Restaurar sistema (admin)
+============================*/
 function restoreSystemHandler(){
   if(role !== 'admin') return alert('Solo administrador');
   if(!confirm('Restaurar sistema eliminará todas las sesiones, mesas ocupadas y el historial. ¿Continuar?')) return;
   localStorage.removeItem(STATE_KEY);
   localStorage.removeItem(HISTORY_KEY);
-  // reset in-memory
   initTables(); sessions = {}; products = [];
   saveState(); renderTables(); renderCounters();
   showMesasView();
   alert('Sistema restaurado correctamente.');
 }
 
-/* ---------------------------
-  Abrir manual
-----------------------------*/
+/* ============================
+   Abrir mesa manualmente
+============================*/
 function manualOpen(){
   const val = $('manualTable').value.trim();
   if(!val) return alert('Ingrese número de mesa o barra');
@@ -804,9 +838,9 @@ function manualOpen(){
   else alert('Mesa no válida');
 }
 
-/* ---------------------------
-  Persistencia (localStorage)
-----------------------------*/
+/* ============================
+   Persistencia: guardar / cargar estado
+============================*/
 function saveState(){
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify({ tables, sessions, products }));
@@ -833,12 +867,11 @@ function loadState(){
   } catch(e){ console.error(e); }
 }
 
-/* ---------------------------
-  Guard: persistir antes de cerrar
-----------------------------*/
+/* ============================
+   Guard: persistir antes de cerrar la pestaña
+============================*/
 window.addEventListener('beforeunload', () => saveState());
 
 </script>
 </body>
 </html>
-
