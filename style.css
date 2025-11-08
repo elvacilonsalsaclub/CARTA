@@ -1,0 +1,149 @@
+﻿body, html {
+  margin: 0;
+  padding: 0;
+  font-family: 'Montserrat', sans-serif;
+  color: white;
+  overflow: hidden;
+}
+
+#bg-video {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  min-width: 100%;
+  min-height: 100%;
+  z-index: -1;
+  filter: brightness(0.3);
+}
+
+.hidden {
+  display: none;
+}
+
+#login-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+#login-container .logo {
+  width: 150px;
+  margin-bottom: 20px;
+}
+
+#login-container h1 {
+  margin-bottom: 20px;
+  color: #f5d97a;
+}
+
+#login-container input {
+  display: block;
+  margin: 10px auto;
+  padding: 10px;
+  width: 200px;
+  border: none;
+  border-radius: 8px;
+  text-align: center;
+}
+
+#login-container button {
+  padding: 10px 30px;
+  border: none;
+  background: #f5d97a;
+  color: #000;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+#login-container button:hover {
+  background: #fff;
+}
+
+footer {
+  margin-top: 15px;
+  font-size: 12px;
+  color: #ddd;
+}
+
+#main-panel {
+  padding: 20px;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+header .panel-logo {
+  width: 80px;
+}
+
+header button {
+  background: #f5d97a;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 15px;
+  margin-left: 10px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+header button:hover {
+  background: #fff;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+th, td {
+  border-bottom: 1px solid #555;
+  padding: 8px;
+}
+
+th {
+  background: rgba(245,217,122,0.2);
+}
+
+#modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background: #222;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+  border: 2px solid #f5d97a;
+}
+
+.modal h2 {
+  color: #f5d97a;
+  margin-bottom: 20px;
+}
+
+.modal button {
+  background: #f5d97a;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  margin: 5px;
+  cursor: pointer;
+}
