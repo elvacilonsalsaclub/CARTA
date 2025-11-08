@@ -1,653 +1,182 @@
-﻿<!doctype html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>El Vacilón Salsa Club — Sistema</title>
-
-  <!-- Montserrat -->
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap" rel="stylesheet">
-
-  <!-- Estilos separados -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>El Vacilón Salsa Club</title>
   <link rel="stylesheet" href="style.css">
-
-  <!-- SheetJS para leer XLSX desde el navegador -->
-  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
-  <!-- Video de fondo -->
-  <div class="bg-video" aria-hidden="true">
-    <video id="bgVideo" autoplay muted loop playsinline>
-      <source src="video_elvacilon1.mp4" type="video/mp4">
-    </video>
-  </div>
+  <!-- VIDEO DE FONDO -->
+  <video autoplay muted loop id="bgVideo">
+    <source src="video_elvacilon1.mp4" type="video/mp4">
+  </video>
 
   <!-- LOGIN -->
-  <main id="loginScreen" class="center-screen">
-    <div class="card login-card">
-      <img src="logo_elvacilon1.png" alt="El Vacilón Salsa Club" class="logo-main">
-      <h1 class="title-gold">El Vacilón Salsa Club</h1>
-      <p class="subtitle">Inicie sesión</p>
-
-      <input id="inputUser" type="text" placeholder="Usuario (ej: alex)" autocomplete="username">
-      <input id="inputPass" type="password" placeholder="Contraseña" autocomplete="current-password">
-      <div class="row-gap">
-        <button id="btnLogin" class="btn-primary">Ingresar</button>
-        <button id="btnDemo" class="btn-ghost">Demo</button>
-      </div>
-
-      <p class="small-muted">Usuarios por defecto: alex/123, santiago/456, mesero3/3, mesero4/4, cajera/123456, admin/123456789</p>
-
-      <footer class="login-footer">© 2025 El Vacilón Salsa Club — Todos los derechos reservados</footer>
-    </div>
-  </main>
-
-  <!-- MAIN APP -->
-  <div id="app" class="hidden">
-    <header class="app-header">
-      <div class="left-header">
-        <img src="logo_elvacilon1.png" class="header-logo" alt="logo">
-        <div>
-          <div class="app-title">El Vacilón Salsa Club</div>
-          <div id="userInfo" class="small-muted"></div>
-        </div>
-      </div>
-
-      <div class="right-header">
-        <!-- Visible only for meseros/cajera -->
-        <button id="btnSelectDay" class="btn-primary hidden">Seleccione día de precios</button>
-        <button id="btnPrintPriceList" class="btn-ghost hidden">Imprimir lista de precios</button>
-        <button id="btnOpenBilling" class="btn-ghost hidden">Facturación / Comandas</button>
-
-        <button id="btnLogout" class="btn-ghost">Cerrar sesión</button>
-      </div>
-    </header>
-
-    <section class="main-grid">
-      <!-- LEFT: mesas / productos / comanda -->
-      <div class="panel panel-left">
-        <div class="panel-header">
-          <h3>Mesas</h3>
-        </div>
-
-        <div class="tables-row" id="tablesArea"></div>
-
-        <hr>
-
-        <div class="panel-section">
-          <h4>Seleccionar mesa</h4>
-          <div class="row-gap">
-            <input id="inputMesa" type="text" placeholder="Ej: 1, 1A, 2B" />
-            <button id="btnConfirmMesa" class="btn-primary">Abrir mesa</button>
-          </div>
-          <p class="small-muted">Al abrir la mesa se activará la tabla de productos para tomar la comanda.</p>
-        </div>
-
-        <div class="panel-section" id="productsPanel" style="display:none;">
-          <div class="panel-subheader">
-            <h4>Productos</h4>
-            <div>
-              <input id="searchInput" type="text" placeholder="Buscar por número o nombre" />
-            </div>
-          </div>
-          <div class="table-wrapper">
-            <table id="productsTable" class="striped">
-              <thead>
-                <tr><th style="width:70px">#</th><th>Producto</th><th style="width:140px">Precio</th><th style="width:120px">Acción</th></tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- RIGHT: carrito/comanda + resumen -->
-      <div class="panel panel-right">
-        <div class="panel-header">
-          <h3>Comanda / Factura POS</h3>
-        </div>
-
-        <div id="cartArea" class="panel-section">
-          <div class="row-gap">
-            <div>Mesa: <span id="currentMesa" class="badge">—</span></div>
-            <div class="cart-controls">
-              <label class="small-muted">Propina:
-                <input id="chkTip" type="checkbox" checked />
-              </label>
-              <label class="small-muted"> %:
-                <input id="tipPercent" type="number" value="10" min="0" style="width:70px;padding:6px;border-radius:6px;border:none" />
-              </label>
-            </div>
-          </div>
-
-          <div class="table-wrapper small-scroll">
-            <table id="cartTable" class="striped">
-              <thead><tr><th>#</th><th>Producto</th><th>Cant.</th><th>Precio</th><th>Total</th><th></th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-
-          <div class="cart-summary">
-            <div>Subtotal: <strong id="subtotalText">$0</strong></div>
-            <div>Propina: <strong id="tipText">$0</strong></div>
-            <div class="total-line">Total: <strong id="totalText">$0</strong></div>
-          </div>
-
-          <div class="row-gap">
-            <button id="btnAddManual" class="btn-ghost">Agregar manual</button>
-            <button id="btnPrintTicket" class="btn-primary">Imprimir Cuenta de Consumo (POS)</button>
-            <button id="btnCloseAccount" class="btn-ghost">Cerrar cuenta (Marcar cerrada)</button>
-          </div>
-          <p class="small-muted">Nota: La impresión POS está preparada para ancho 80mm.</p>
-        </div>
-      </div>
-    </section>
+  <div id="loginScreen" class="login-container">
+    <img src="logo_elvacilon1.png" alt="Logo" class="logo">
+    <h1>Bienvenido a <span>El Vacilón Salsa Club</span></h1>
+    <input id="inputUser" type="text" placeholder="Usuario">
+    <input id="inputPass" type="password" placeholder="Contraseña">
+    <button id="btnLogin">Ingresar</button>
   </div>
 
-  <!-- MODAL: Seleccione día de precios -->
-  <div id="modalDay" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-box">
-      <h3>Seleccione día de precios</h3>
-      <p class="small-muted">Elija la lista de precios que desea cargar (archivo en la misma carpeta)</p>
-      <label class="radio"><input type="radio" name="dayPrice" value="JVS.xlsx" checked> Día Normal — JVS.xlsx</label>
-      <label class="radio"><input type="radio" name="dayPrice" value="DOMINGO.xlsx"> Domingo — DOMINGO.xlsx</label>
-
-      <div class="modal-actions">
-        <button id="btnLoadPrices" class="btn-primary">Cargar precios</button>
-        <button id="btnCancelModal" class="btn-ghost">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-<script>
-/* ---------------------------
-  Config y usuarios
-----------------------------*/
-const USERS = {
-  alex: '123',
-  santiago: '456',
-  mesero3: '3',
-  mesero4: '4',
-  cajera: '123456',
-  admin: '123456789'
-};
-
-/* estado */
-let currentUser = null;
-let role = null; // 'mesero'|'cajera'|'admin'
-let products = []; // {id, nombre, precio}
-let tables = [];   // lista de mesas con sesiones
-let currentMesa = null;
-let currentSession = null; // object with items etc.
-
-/* helpers */
-const $ = id => document.getElementById(id);
-const money = n => '$' + Number(Math.round(n)).toLocaleString();
-const parseNum = v => Number(String(v||0).replace(/[^0-9.\-]/g,'')) || 0;
-
-/* inicial */
-document.addEventListener('DOMContentLoaded', ()=> {
-  initTablesUI();
-  // login handlers
-  $('btnLogin').addEventListener('click', onLogin);
-  $('btnDemo').addEventListener('click', ()=>{ $('inputUser').value='alex'; $('inputPass').value='123'; onLogin(); });
-  $('btnLogout').addEventListener('click', () => location.reload());
-
-  // modal handlers
-  $('btnSelectDay').addEventListener('click', ()=> showModal());
-  $('btnCancelModal').addEventListener('click', ()=> hideModal());
-  $('btnLoadPrices').addEventListener('click', loadSelectedPrices);
-
-  // price list print
-  $('btnPrintPriceList').addEventListener('click', printPriceList);
-
-  // mesa open
-  $('btnConfirmMesa').addEventListener('click', ()=> {
-    const m = $('inputMesa').value.trim();
-    if(!m) return alert('Ingresa el número de mesa');
-    openMesa(m);
-  });
-
-  // product search
-  $('searchInput').addEventListener('input', onSearchProducts);
-
-  // add manual
-  $('btnAddManual').addEventListener('click', addManualLine);
-
-  // print ticket
-  $('btnPrintTicket').addEventListener('click', printTicketPOS);
-
-  // close account
-  $('btnCloseAccount').addEventListener('click', closeAccount);
-});
-
-/* ---------------------------
-  Login / roles
-----------------------------*/
-function onLogin(){
-  const u = $('inputUser').value.trim().toLowerCase();
-  const p = $('inputPass').value.trim();
-  if(!u || !p) return alert('Ingrese usuario y contraseña');
-  if(USERS[u] && USERS[u] === p){
-    currentUser = u;
-    role = (u === 'cajera') ? 'cajera' : (u === 'admin' ? 'admin' : 'mesero');
-    $('loginScreen').classList.add('hidden');
-    $('app').classList.remove('hidden');
-    $('userInfo').innerText = `${u} — ${role}`;
-    // admin restrictions
-    if(role === 'admin'){
-      // admin: no botones de mesero/cajera
-      hideElement('btnSelectDay'); hideElement('btnPrintPriceList'); hideElement('btnOpenBilling');
-      // admin view could be extended (not implemented full)
-      alert('Ingresó como administrador. Funciones de facturación están ocultas.');
-    } else {
-      // mesero / cajera: show modal automatically then show buttons
-      showElement('btnSelectDay'); showElement('btnPrintPriceList'); showElement('btnOpenBilling');
-      // show modal automatically
-      setTimeout(()=> showModal(), 300);
-    }
-  } else {
-    alert('Usuario o contraseña incorrectos');
-  }
-}
-
-/* ---------------------------
-  Modal precios
-----------------------------*/
-function showModal(){ $('modalDay').classList.remove('hidden'); }
-function hideModal(){ $('modalDay').classList.add('hidden'); }
-
-async function loadSelectedPrices(){
-  const radios = document.getElementsByName('dayPrice');
-  let file = 'JVS.xlsx';
-  for(const r of radios) if(r.checked) file = r.value;
-  try {
-    await loadProductsFromExcel(file);
-    renderProductsTable();
-    hideModal();
-    alert(`Cargados ${products.length} productos desde ${file}`);
-  } catch (e) {
-    console.error(e);
-    alert('Error cargando archivo. Asegúrate que '+file+' esté en la misma carpeta y accesible desde el servidor.');
-  }
-}
-
-/* ---------------------------
-  Leer Excel via fetch + SheetJS
-  (funciona en hosting o GH Pages)
-----------------------------*/
-async function loadProductsFromExcel(filename){
-  const res = await fetch(filename);
-  if(!res.ok) throw new Error('HTTP ' + res.status);
-  const ab = await res.arrayBuffer();
-  const wb = XLSX.read(ab, {type:'array'});
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const json = XLSX.utils.sheet_to_json(sheet, {defval: ''});
-  // normalize: buscar columnas por nombre (producto / valor) o por posición
-  products = json.map((row, idx) => {
-    const keys = Object.keys(row);
-    let nombre = '';
-    let precio = 0;
-    for(const k of keys){
-      const kl = k.toLowerCase();
-      if(kl.includes('producto') || kl.includes('nombre') || kl.includes('product')) nombre = row[k];
-      if(kl.includes('valor') || kl.includes('precio') || kl.includes('price')) precio = row[k];
-    }
-    if(!nombre && keys.length>=1) nombre = row[keys[0]];
-    if((!precio || precio===0) && keys.length>=2) precio = row[keys[1]];
-    return { id: idx+1, nombre: String(nombre).trim(), precio: parseNum(precio) };
-  }).filter(p => p.nombre);
-}
-
-/* ---------------------------
-  Render productos (tabla)
-----------------------------*/
-function renderProductsTable(){
-  const tbody = document.querySelector('#productsTable tbody');
-  tbody.innerHTML = '';
-  products.forEach(p => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="center">${p.id}</td>
-      <td>${escapeHtml(p.nombre)}</td>
-      <td class="right">${money(p.precio)}</td>
-      <td class="center"><button class="btn-ghost small" onclick="addProductToCart(${p.id})">Agregar</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
-  // show products panel
-  $('productsPanel').style.display = '';
-}
-
-/* search */
-function onSearchProducts(){
-  const q = $('searchInput').value.trim().toLowerCase();
-  const tbody = document.querySelector('#productsTable tbody');
-  tbody.innerHTML = '';
-  products.filter(p => {
-    if(!q) return true;
-    return String(p.id).includes(q) || p.nombre.toLowerCase().includes(q);
-  }).forEach(p => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td class="center">${p.id}</td><td>${escapeHtml(p.nombre)}</td><td class="right">${money(p.precio)}</td><td class="center"><button class="btn-ghost small" onclick="addProductToCart(${p.id})">Agregar</button></td>`;
-    tbody.appendChild(tr);
-  });
-}
-
-/* ---------------------------
-  Mesas UI
-----------------------------*/
-function initTablesUI(){
-  const area = $('tablesArea');
-  area.innerHTML = '';
-  for(let i=1;i<=28;i++){
-    const but = document.createElement('button');
-    but.className = 'table-btn';
-    but.innerText = i;
-    but.addEventListener('click', ()=> {
-      $('inputMesa').value = String(i);
-      openMesa(String(i));
-    });
-    area.appendChild(but);
-  }
-}
-
-/* ---------------------------
-  Abrir mesa / sesión
-----------------------------*/
-function openMesa(mesa){
-  currentMesa = mesa;
-  $('currentMesa').innerText = mesa;
-  // try find existing table session or create
-  if(!tables) tables = [];
-  let t = tables.find(x=>x.mesa === mesa);
-  if(!t){
-    t = { mesa, visits: 1, sessions: [] };
-    tables.push(t);
-  } else {
-    t.visits += 1;
-  }
-  // create session object
-  const sess = { id: 's_'+Math.random().toString(36).slice(2,9), mesa, createdAt: new Date().toISOString(), items: [], closed:false, tipPercent: 10, tipApplied: true, discount: 0, waiter: currentUser };
-  t.sessions.push(sess);
-  currentSession = sess;
-  // show products panel if products already loaded
-  if(products && products.length>0) {
-    renderProductsTable();
-  } else {
-    // if products not loaded yet, force modal
-    showModal();
-  }
-  renderCartUI();
-}
-
-/* ---------------------------
-  Carrito / comanda
-----------------------------*/
-function addProductToCart(productId){
-  if(!currentSession) return alert('Primero abre una mesa.');
-  const prod = products.find(p => p.id === productId);
-  if(!prod) return alert('Producto no encontrado');
-  // check if exists in session
-  let item = currentSession.items.find(i => i.productId === productId);
-  if(item) item.qty += 1;
-  else currentSession.items.push({ productId: prod.id, name: prod.nombre, price: prod.precio, qty: 1 });
-  saveState();
-  renderCartUI();
-}
-
-function addManualLine(){
-  if(!currentSession) return alert('Abra primero una mesa');
-  const name = prompt('Nombre del producto:');
-  if(!name) return;
-  const price = parseNum(prompt('Valor unitario (sin $):', '0'));
-  if(isNaN(price)) return alert('Valor inválido');
-  currentSession.items.push({ productId: null, name, price, qty: 1 });
-  saveState();
-  renderCartUI();
-}
-
-function renderCartUI(){
-  const tbody = document.querySelector('#cartTable tbody');
-  tbody.innerHTML = '';
-  if(!currentSession){
-    tbody.innerHTML = '<tr><td colspan="6" class="center small-muted">No hay sesión activa</td></tr>';
-    updateTotals();
-    return;
-  }
-  if(currentSession.items.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="center small-muted">Sin items — agrega productos</td></tr>';
-  } else {
-    currentSession.items.forEach((it, idx) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="center">${it.productId || '-'}</td>
-        <td>${escapeHtml(it.name)}</td>
-        <td class="center"><input class="qty-input" type="number" min="1" value="${it.qty}" onchange="onQtyChange(this, ${idx})" style="width:60px"></td>
-        <td class="right">${money(it.price)}</td>
-        <td class="right">${money(it.price * it.qty)}</td>
-        <td class="center"><button class="btn-ghost small" onclick="removeItem(${idx})">Eliminar</button></td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
-  updateTotals();
-}
-
-function onQtyChange(input, idx){
-  const v = parseInt(input.value) || 0;
-  currentSession.items[idx].qty = v;
-  saveState();
-  renderCartUI();
-}
-
-function removeItem(idx){
-  currentSession.items.splice(idx,1);
-  saveState();
-  renderCartUI();
-}
-
-function updateTotals(){
-  if(!currentSession) {
-    $('subtotalText').innerText = money(0);
-    $('tipText').innerText = money(0);
-    $('totalText').innerText = money(0);
-    return;
-  }
-  const subtotal = currentSession.items.reduce((s,it)=> s + parseNum(it.price) * (parseInt(it.qty)||0), 0);
-  const tipPercent = parseFloat($('tipPercent').value) || 0;
-  const tipApplied = $('chkTip').checked;
-  const tip = tipApplied ? Math.round(subtotal * (tipPercent/100)) : 0;
-  const total = subtotal + tip - (currentSession.discount || 0);
-  $('subtotalText').innerText = money(subtotal);
-  $('tipText').innerText = money(tip);
-  $('totalText').innerText = money(total);
-}
-
-/* ---------------------------
-  Cerrar cuenta (marcar cerrada)
-----------------------------*/
-function closeAccount(){
-  if(!currentSession) return alert('No hay sesión activa');
-  const confirmClose = confirm('¿Cerrar y marcar la cuenta como pagada?');
-  if(!confirmClose) return;
-  const tableObj = tables.find(t => t.mesa === currentSession.mesa);
-  if(tableObj){
-    const sess = tableObj.sessions.find(s => s.id === currentSession.id);
-    if(sess) {
-      const totals = computeTotalsForSession(sess);
-      sess.closed = true;
-      sess.closedAt = new Date().toISOString();
-      sess.finalTotals = totals;
-    }
-  }
-  saveState();
-  alert('Cuenta cerrada. Total: ' + money(computeTotalsForSession(currentSession).total));
-  // clear currentSession but keep history
-  currentSession = null;
-  $('currentMesa').innerText = '—';
-  renderCartUI();
-}
-
-/* compute totals helper */
-function computeTotalsForSession(sess){
-  const subtotal = sess.items.reduce((s,it) => s + parseNum(it.price) * (parseInt(it.qty)||0), 0);
-  const tipPercent = parseFloat($('tipPercent').value) || 0;
-  const tipApplied = $('chkTip').checked;
-  const tip = tipApplied ? Math.round(subtotal * (tipPercent/100)) : 0;
-  const total = subtotal + tip - (sess.discount || 0);
-  return { subtotal, tip, total };
-}
-
-/* ---------------------------
-  Impresión: Lista de precios (carta)
-----------------------------*/
-function printPriceList(){
-  if(!products || products.length === 0) return alert('Primero cargue la lista de precios');
-  const now = new Date().toLocaleString();
-  let rows = '';
-  products.forEach(p => {
-    rows += `<tr><td style="width:50px">${p.id}</td><td>${escapeHtml(p.nombre)}</td><td style="text-align:right">${money(p.precio)}</td></tr>`;
-  });
-  const html = `
-  <html>
-  <head>
-    <title>Lista de Precios - El Vacilón</title>
-    <style>
-      body{font-family:Montserrat, sans-serif;margin:20px;color:#000}
-      .center{text-align:center}
-      table{width:100%;border-collapse:collapse;margin-top:10px}
-      th,td{padding:6px;border-bottom:1px solid #ddd}
-      th{background:#f5e7c2}
-      img{max-width:120px;display:block;margin:0 auto 6px}
-      .meta{font-size:12px;margin-top:6px}
-    </style>
-  </head>
-  <body>
-    <div class="center">
-      <img src="logo_elvacilon1.png" alt="logo">
+  <!-- APLICACIÓN -->
+  <div id="app" class="hidden app-container">
+    <div class="top-bar">
       <h2>El Vacilón Salsa Club</h2>
-      <div class="meta">Carrera 23a # 7A - 15 • Cel: 3147159066 - 3136188889 • Instagram: @elvacilonclub</div>
-      <div class="meta">Impresión: ${now}</div>
+      <div id="userInfo"></div>
+      <button id="btnLogout">Salir</button>
     </div>
-    <table>
-      <thead><tr><th>#</th><th>Producto</th><th style="text-align:right">Valor</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </body>
-  </html>
-  `;
-  const w = window.open('', '_blank');
-  w.document.write(html);
-  w.document.close();
-  w.print();
-}
 
-/* ---------------------------
-  Impresión: Ticket POS (80mm)
-----------------------------*/
-function printTicketPOS(){
-  if(!currentSession) return alert('Abra una mesa y agregue items antes de imprimir');
-  const now = new Date();
-  const fecha = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
-  // build items rows
-  let itemsHtml = '';
-  currentSession.items.forEach(it => {
-    const lineTotal = parseNum(it.price) * (parseInt(it.qty)||0);
-    // truncate name to fit
-    const name = String(it.name).slice(0, 24);
-    itemsHtml += `<tr><td style="width:40px;text-align:center">${it.qty}</td><td style="padding-left:6px">${escapeHtml(name)}</td><td style="text-align:right">${money(lineTotal)}</td></tr>`;
-  });
-  const totals = computeTotalsForSession(currentSession);
-  const html = `
-  <html>
-  <head>
-    <title>Cuenta de Consumo</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <style>
-      @media print {
-        @page { size: 80mm auto; margin: 6mm; }
-        body { width: 80mm; font-family: monospace; font-size: 11px; color:#000; }
+    <div class="controls">
+      <button id="btnSelectDay">Seleccionar día de precios</button>
+      <button id="btnPrintPriceList">Imprimir lista de precios</button>
+    </div>
+
+    <div id="productsPanel" class="hidden">
+      <h3>Lista de productos</h3>
+      <input type="text" id="searchInput" placeholder="Buscar producto o número...">
+      <table id="productsTable">
+        <thead>
+          <tr><th>#</th><th>Producto</th><th>Precio</th><th>Acción</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MODAL DE SELECCIÓN DE PRECIOS -->
+  <div id="modalDay" class="modal hidden">
+    <div class="modal-content">
+      <h3>Seleccione día de precios</h3>
+      <label><input type="radio" name="dayPrice" value="JVS.xlsx" checked> Día Normal</label>
+      <label><input type="radio" name="dayPrice" value="DOMINGO.xlsx"> Domingo</label>
+      <div class="modal-buttons">
+        <button id="btnLoadPrices">Cargar precios</button>
+        <button id="btnCancelModal" class="cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    © 2025 El Vacilón Salsa Club — Carrera 23a # 7A - 15 — Cel: 3147159066 / 3136188889 — Instagram: @elvacilonclub
+  </footer>
+
+  <script>
+    // ======== VARIABLES GLOBALES ========
+    const USERS = {
+      admin: '123456789',
+      cajera: '123456',
+      alex: '123',
+      santiago: '456',
+      mesero3: '3',
+      mesero4: '4'
+    };
+
+    let currentUser = null;
+    let role = null;
+    let products = [];
+
+    const $ = id => document.getElementById(id);
+    const money = n => '$' + Number(n).toLocaleString();
+
+    // ======== LOGIN ========
+    $('btnLogin').addEventListener('click', () => {
+      const user = $('inputUser').value.trim().toLowerCase();
+      const pass = $('inputPass').value.trim();
+      if (!USERS[user] || USERS[user] !== pass) {
+        alert('Usuario o contraseña incorrectos');
+        return;
       }
-      body { font-family: monospace; width: 80mm; margin: 0 auto; color:#000; }
-      .center { text-align:center; }
-      .bold { font-weight:700; }
-      img.logo { max-width:120px; display:block; margin:0 auto 6px; }
-      table { width:100%; border-collapse:collapse; }
-      td { padding:3px 0; vertical-align:top; }
-      .line { border-top:1px dashed #000; margin:6px 0; }
-      .right { text-align:right; }
-      .small { font-size:11px; }
-    </style>
-  </head>
-  <body>
-    <div class="center">
-      <img class="logo" src="logo_elvacilon1.png" alt="logo">
-      <div class="bold">EL VACILÓN SALSA CLUB</div>
-      <div class="small">Carrera 23a # 7A - 15</div>
-      <div class="small">Cel: 3147159066 - 3136188889</div>
-      <div class="small">Instagram: @elvacilonclub</div>
-      <div class="line"></div>
-      <div class="bold">CUENTA DE CONSUMO</div>
-      <div class="small">Mesa: ${escapeHtml(currentSession.mesa)}   Fecha: ${escapeHtml(fecha)}</div>
-      <div class="line"></div>
-    </div>
+      currentUser = user;
+      role = (user === 'admin') ? 'admin' : (user === 'cajera') ? 'cajera' : 'mesero';
+      $('loginScreen').classList.add('hidden');
+      $('app').classList.remove('hidden');
+      $('userInfo').innerText = `Usuario: ${user} (${role})`;
 
-    <table>
-      ${itemsHtml}
-    </table>
+      // Solo meseros y cajera ven el modal
+      if (role !== 'admin') {
+        setTimeout(() => $('modalDay').classList.remove('hidden'), 300);
+      }
+    });
 
-    <div class="line"></div>
-    <table>
-      <tr><td>Subtotal:</td><td class="right">${money(totals.subtotal)}</td></tr>
-      <tr><td>Propina (${parseFloat($('tipPercent').value)||0}%):</td><td class="right">${money(totals.tip)}</td></tr>
-      <tr><td class="bold">Total:</td><td class="right bold">${money(totals.total)}</td></tr>
-    </table>
+    // ======== MODAL ========
+    $('btnCancelModal').addEventListener('click', () => $('modalDay').classList.add('hidden'));
 
-    <div style="margin-top:8px;text-align:center;font-weight:700">¡Gracias por su visita!</div>
-    <div style="text-align:center">El Vacilón Salsa Club</div>
-    <div style="height:20px"></div>
-  </body>
-  </html>
-  `;
-  const w = window.open('', '_blank', 'width=400,height=800');
-  w.document.write(html);
-  w.document.close();
-  // wait a bit for images to load then print
-  setTimeout(()=> { w.print(); }, 700);
-}
+    $('btnLoadPrices').addEventListener('click', async () => {
+      const selected = document.querySelector('input[name="dayPrice"]:checked').value;
+      try {
+        await loadExcel(selected);
+        $('modalDay').classList.add('hidden');
+        renderProducts();
+        alert(`Precios cargados desde ${selected}`);
+      } catch (e) {
+        alert('Error al cargar archivo. Asegúrate que está en la misma carpeta.');
+        console.error(e);
+      }
+    });
 
-/* ---------------------------
-  Utilidades: guardar estado
-----------------------------*/
-function saveState(){
-  try {
-    const state = { products, tables };
-    localStorage.setItem('ev_state', JSON.stringify(state));
-  } catch(e){}
-}
-function loadState(){
-  try {
-    const raw = localStorage.getItem('ev_state');
-    if(!raw) return;
-    const obj = JSON.parse(raw);
-    if(obj.products) products = obj.products;
-    if(obj.tables) tables = obj.tables;
-  } catch(e){}
-}
-loadState();
+    // ======== CARGAR EXCEL ========
+    async function loadExcel(file) {
+      const res = await fetch(file);
+      const ab = await res.arrayBuffer();
+      const wb = XLSX.read(ab, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      products = json.map((row, i) => ({
+        id: i + 1,
+        nombre: row['producto'] || row['Producto'] || Object.values(row)[0],
+        precio: row['valor'] || row['Valor'] || Object.values(row)[1]
+      }));
+    }
 
-/* ---------------------------
-  Helpers
-----------------------------*/
-function escapeHtml(str){
-  if(str===undefined || str===null) return '';
-  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-function showElement(id){ const e = $(id); if(e) e.classList.remove('hidden'); }
-function hideElement(id){ const e = $(id); if(e) e.classList.add('hidden'); }
+    // ======== MOSTRAR PRODUCTOS ========
+    function renderProducts() {
+      const tbody = $('productsTable').querySelector('tbody');
+      tbody.innerHTML = '';
+      products.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.id}</td>
+          <td>${p.nombre}</td>
+          <td>${money(p.precio)}</td>
+          <td><button>Agregar</button></td>`;
+        tbody.appendChild(tr);
+      });
+      $('productsPanel').classList.remove('hidden');
+    }
 
-</script>
+    // ======== IMPRIMIR LISTA DE PRECIOS ========
+    $('btnPrintPriceList').addEventListener('click', () => {
+      if (products.length === 0) return alert('Primero cargue la lista de precios');
+      const fecha = new Date().toLocaleString();
+      let filas = products.map(p => `<tr><td>${p.id}</td><td>${p.nombre}</td><td style="text-align:right">${money(p.precio)}</td></tr>`).join('');
+      const html = `
+      <html><head><title>Lista de Precios</title>
+      <style>
+        body { font-family: Montserrat, sans-serif; margin: 10px; color: #000; }
+        h2 { text-align:center; }
+        table { width:100%; border-collapse:collapse; margin-top:10px; }
+        th,td { padding:4px; border-bottom:1px solid #ccc; }
+        th { background:#f0d98a; }
+        img { display:block; margin:0 auto; width:100px; }
+        .meta { text-align:center; font-size:12px; }
+      </style></head><body>
+        <img src="logo_elvacilon1.png" alt="logo">
+        <h2>El Vacilón Salsa Club</h2>
+        <div class="meta">Carrera 23a #7A-15 — Cel: 3147159066 / 3136188889</div>
+        <div class="meta">Instagram: @elvacilonclub</div>
+        <div class="meta">Fecha: ${fecha}</div>
+        <table><thead><tr><th>#</th><th>Producto</th><th>Valor</th></tr></thead><tbody>${filas}</tbody></table>
+      </body></html>`;
+      const w = window.open('', '_blank');
+      w.document.write(html);
+      w.document.close();
+      w.print();
+    });
+  </script>
 </body>
 </html>
