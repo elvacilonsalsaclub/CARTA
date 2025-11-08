@@ -248,17 +248,42 @@ document.addEventListener('DOMContentLoaded', () => {
 /* ---------------------------
    Start clock (header)
 ----------------------------*/
-function startClock(){
-  const el = $('clock');
-  function tick(){
-    const now = new Date();
-    const opts = { weekday:'long', year:'numeric', month:'2-digit', day:'2-digit' };
-    const dateStr = now.toLocaleDateString('es-ES', opts);
-    const timeStr = now.toLocaleTimeString('es-CO');
-    el.innerText = `${capitalize(dateStr)} — ${timeStr}`;
+async function loadProductsFromExcel(filename){
+  try {
+    // Aseguramos la ruta correcta (misma carpeta que el index)
+    const fileUrl = `${window.location.origin}${window.location.pathname.replace(/\/[^/]*$/, '/')}${filename}`;
+    const res = await fetch(fileUrl);
+    if(!res.ok) throw new Error(`No se pudo cargar ${filename}. Verifique que esté en la misma carpeta del index.`);
+    
+    const ab = await res.arrayBuffer();
+    const wb = XLSX.read(ab, { type:'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    products = json.map((row, idx) => {
+      const keys = Object.keys(row);
+      let nombre = '', precio = 0;
+      for(const k of keys){
+        const kl = k.toLowerCase();
+        if(kl.includes('producto') || kl.includes('nombre') || kl.includes('product')) nombre = row[k];
+        if(kl.includes('valor') || kl.includes('precio') || kl.includes('price')) precio = row[k];
+      }
+      if(!nombre && keys.length>=1) nombre = row[keys[0]];
+      if((!precio || precio===0) && keys.length>=2) precio = row[keys[1]];
+      return { id: idx+1, nombre: String(nombre).trim(), precio: parseNum(precio) };
+    }).filter(p => p.nombre);
+
+    if(products.length === 0) throw new Error('No se encontraron productos válidos en el archivo.');
+
+    saveState();
+    renderProductsSmall();
+    alert(`✅ Cargados ${products.length} productos desde ${filename}`);
+  } catch(e){
+    console.error('Error cargando Excel:', e);
+    alert(`❌ Error cargando precios: ${e.message}`);
+    products = [];
   }
-  tick(); setInterval(tick, 1000);
 }
+
 function capitalize(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
 
 /* ---------------------------
