@@ -1,0 +1,283 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discoteca El Vacilón</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    video.background {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      min-width: 100%;
+      min-height: 100%;
+      object-fit: cover;
+      z-index: -1;
+    }
+    .login-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: white;
+      background: rgba(0, 0, 0, 0.6);
+      text-align: center;
+    }
+    .login-box {
+      background: rgba(0, 0, 0, 0.7);
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 0 10px #000;
+    }
+    input, select {
+      margin: 5px;
+      padding: 8px;
+      border-radius: 5px;
+      border: none;
+    }
+    button {
+      background-color: #ff0066;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #ff3385;
+    }
+    #app {
+      display: none;
+      padding: 20px;
+      color: white;
+      background-color: rgba(0,0,0,0.8);
+      height: 100%;
+      overflow-y: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      background: white;
+      color: black;
+      border-radius: 8px;
+    }
+    th, td {
+      padding: 8px;
+      text-align: center;
+      border-bottom: 1px solid #ddd;
+    }
+    .invoice {
+      font-family: 'Courier New', Courier, monospace;
+      width: 300px;
+      background: white;
+      color: black;
+      padding: 20px;
+      border-radius: 10px;
+    }
+    .invoice img {
+      width: 100px;
+      display: block;
+      margin: 0 auto 10px auto;
+    }
+    .invoice h3, .invoice p {
+      text-align: center;
+      margin: 2px 0;
+    }
+    .total {
+      text-align: right;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <!-- Video de fondo -->
+  <video autoplay muted loop class="background">
+    <source src="video_elvacilon1.mp4" type="video/mp4">
+  </video>
+
+  <!-- Pantalla de login -->
+  <div class="login-container" id="login">
+    <img src="logo_elvacilon1.png" alt="Logo Discoteca" width="200">
+    <div class="login-box">
+      <h2>Bienvenido a El Vacilón</h2>
+      <input type="text" id="usuario" placeholder="Usuario">
+      <input type="password" id="clave" placeholder="Contraseña">
+      <button onclick="login()">Ingresar</button>
+    </div>
+  </div>
+
+  <!-- Sistema interno -->
+  <div id="app">
+    <h2>Bienvenido, <span id="rol"></span></h2>
+
+    <h3>Comanda / Factura</h3>
+    <table id="tablaProductos">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Producto</th>
+          <th>Cant.</th>
+          <th>Precio</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody id="tbodyProductos"></tbody>
+    </table>
+
+    <button onclick="agregarLinea()">Agregar Línea</button>
+    <h3 id="totalGeneral">Total: $0</h3>
+    <button onclick="imprimirFactura()">Imprimir Factura</button>
+
+    <!-- Factura oculta -->
+    <div id="factura" class="invoice" style="display:none;">
+      <img src="logo_elvacilon1.png" alt="Logo">
+      <h3>Discoteca El Vacilón</h3>
+      <p>Calle Principal #123, Ciudad</p>
+      <p>Celular: +57 300 123 4567</p>
+      <p id="fecha"></p>
+      <hr>
+      <table id="tablaFactura">
+        <tr><td>#</td><td>Producto</td><td>Cant.</td><td>Valor</td></tr>
+      </table>
+      <hr>
+      <p class="total" id="facturaPropina"></p>
+      <p class="total" id="facturaTotal"></p>
+      <hr>
+      <h4 style="text-align:center;">¡Donde la rumba nunca termina!</h4>
+    </div>
+  </div>
+
+  <script>
+    const usuarios = {
+      "alex": "123",
+      "santiago": "456",
+      "mesero3": "3",
+      "mesero4": "4",
+      "cajera": "123456",
+      "admin": "123456789"
+    };
+    const roles = {
+      "alex": "Mesero Alex",
+      "santiago": "Mesero Santiago",
+      "mesero3": "Mesero 3",
+      "mesero4": "Mesero 4",
+      "cajera": "Cajera",
+      "admin": "Administrador"
+    };
+
+    const productos = [
+      { id: 1, nombre: "Whisky", precio: 150000 },
+      { id: 2, nombre: "Cerveza", precio: 12000 },
+      { id: 3, nombre: "Ron", precio: 100000 },
+      { id: 4, nombre: "Aguardiente", precio: 90000 },
+      { id: 5, nombre: "Agua", precio: 5000 },
+      { id: 6, nombre: "Gaseosa", precio: 8000 }
+    ];
+
+    function login() {
+      const u = document.getElementById('usuario').value.trim().toLowerCase();
+      const p = document.getElementById('clave').value.trim();
+      if (usuarios[u] && usuarios[u] === p) {
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        document.getElementById('rol').innerText = roles[u];
+      } else {
+        alert('Usuario o contraseña incorrectos');
+      }
+    }
+
+    function agregarLinea() {
+      const tbody = document.getElementById("tbodyProductos");
+      const fila = document.createElement("tr");
+
+      fila.innerHTML = `
+        <td><input type="number" min="1" onchange="buscarProducto(this)" style="width:50px"></td>
+        <td class="nombreProd"></td>
+        <td><input type="number" min="1" value="1" onchange="calcularLinea(this)" style="width:60px"></td>
+        <td class="precioProd"></td>
+        <td class="totalProd"></td>
+      `;
+      tbody.appendChild(fila);
+    }
+
+    function buscarProducto(input) {
+      const id = parseInt(input.value);
+      const fila = input.closest("tr");
+      const producto = productos.find(p => p.id === id);
+      if (producto) {
+        fila.querySelector(".nombreProd").innerText = producto.nombre;
+        fila.querySelector(".precioProd").innerText = "$" + producto.precio.toLocaleString();
+        fila.dataset.precio = producto.precio;
+        calcularLinea(fila.querySelector('input[type=number]:nth-child(3)'));
+      } else {
+        fila.querySelector(".nombreProd").innerText = "";
+        fila.querySelector(".precioProd").innerText = "";
+        fila.querySelector(".totalProd").innerText = "";
+      }
+      calcularTotalGeneral();
+    }
+
+    function calcularLinea(input) {
+      const fila = input.closest("tr");
+      const cantidad = parseInt(input.value) || 0;
+      const precio = parseInt(fila.dataset.precio || 0);
+      const total = cantidad * precio;
+      fila.querySelector(".totalProd").innerText = "$" + total.toLocaleString();
+      calcularTotalGeneral();
+    }
+
+    function calcularTotalGeneral() {
+      let total = 0;
+      document.querySelectorAll("#tbodyProductos tr").forEach(tr => {
+        const t = tr.querySelector(".totalProd").innerText.replace(/[^0-9]/g, "");
+        total += parseInt(t || 0);
+      });
+      document.getElementById("totalGeneral").innerText = "Total: $" + total.toLocaleString();
+    }
+
+    function imprimirFactura() {
+      const fechaHora = new Date().toLocaleString();
+      document.getElementById('fecha').innerText = "Fecha y hora: " + fechaHora;
+      
+      const tablaFactura = document.getElementById("tablaFactura");
+      tablaFactura.innerHTML = "<tr><td>#</td><td>Producto</td><td>Cant.</td><td>Valor</td></tr>";
+
+      let total = 0;
+      document.querySelectorAll("#tbodyProductos tr").forEach(tr => {
+        const id = tr.querySelector("input").value;
+        const nombre = tr.querySelector(".nombreProd").innerText;
+        const cantidad = tr.querySelectorAll("input")[1].value;
+        const totalLinea = tr.querySelector(".totalProd").innerText;
+        if (nombre) {
+          const fila = `<tr><td>${id}</td><td>${nombre}</td><td>${cantidad}</td><td>${totalLinea}</td></tr>`;
+          tablaFactura.insertAdjacentHTML("beforeend", fila);
+          total += parseInt(totalLinea.replace(/[^0-9]/g, ""));
+        }
+      });
+
+      const propina = total * 0.10;
+      const totalFinal = total + propina;
+
+      document.getElementById("facturaPropina").innerText = "Propina (10%): $" + propina.toLocaleString();
+      document.getElementById("facturaTotal").innerText = "Total: $" + totalFinal.toLocaleString();
+
+      const factura = document.getElementById('factura').outerHTML;
+      const ventana = window.open('', '_blank');
+      ventana.document.write('<html><head><title>Factura</title></head><body>');
+      ventana.document.write(factura);
+      ventana.document.write('</body></html>');
+      ventana.document.close();
+      ventana.print();
+    }
+  </script>
+</body>
+</html>
